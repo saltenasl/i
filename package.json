@@ -21,7 +21,7 @@
     "test:backend": "vitest run -c packages/db/vitest.config.ts && vitest run -c packages/backend/vitest.config.ts",
     "test:rtl": "vitest run -c apps/renderer/vitest.config.ts",
     "test:e2e": "env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm build && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning E2E_HIDE_WINDOW=1 playwright test -c apps/electron/e2e/playwright.config.ts",
-    "verify": "env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm lint && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm typecheck && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm type-safety:check && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm arch:check && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm db:verify && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:backend && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:rtl && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:e2e",
+    "verify": "env -u NO_COLOR pnpm lint && env -u NO_COLOR pnpm typecheck && env -u NO_COLOR pnpm type-safety:check && env -u NO_COLOR pnpm arch:check && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm db:verify && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:backend && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:rtl && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:e2e",
     "prepare": "simple-git-hooks"
   },
   "dependencies": {
