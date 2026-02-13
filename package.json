@@ -10,9 +10,7 @@
   "scripts": {
     "dev": "concurrently -k -n renderer,electron \"pnpm --filter @repo/renderer dev\" \"pnpm --filter @repo/electron dev\"",
     "build": "pnpm --filter @repo/renderer build && pnpm --filter @repo/electron build",
-    "run": "pnpm build && mkdir -p .local && sh -c 'APP_DB_PATH=$(pwd)/.local/app.sqlite RENDERER_DIST=$(pwd)/apps/renderer/dist nohup electron apps/electron/dist/main/index.js > .local/electron.log 2>&1 & echo $! > .local/electron.pid' && echo \"Electron started in background (pid $(cat .local/electron.pid)). Logs: .local/electron.log\"",
-    "run:fg": "pnpm build && mkdir -p .local && APP_DB_PATH=$(pwd)/.local/app.sqlite RENDERER_DIST=$(pwd)/apps/renderer/dist electron apps/electron/dist/main/index.js",
-    "run:stop": "if [ -f .local/electron.pid ]; then kill $(cat .local/electron.pid) && rm -f .local/electron.pid && echo \"Electron stopped.\"; else echo \"No PID file found at .local/electron.pid\"; fi",
+    "run": "pnpm build && mkdir -p .local && APP_DB_PATH=$(pwd)/.local/app.sqlite RENDERER_DIST=$(pwd)/apps/renderer/dist electron apps/electron/dist/main/index.js",
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
@@ -22,7 +20,7 @@
     "db:verify": "node --import tsx packages/db/scripts/db-verify.ts && node --import tsx scripts/check-migration-discipline.ts",
     "test:backend": "vitest run -c packages/db/vitest.config.ts && vitest run -c packages/backend/vitest.config.ts",
     "test:rtl": "vitest run -c apps/renderer/vitest.config.ts",
-    "test:e2e": "env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm build && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning playwright test -c apps/electron/e2e/playwright.config.ts",
+    "test:e2e": "env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm build && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning E2E_HIDE_WINDOW=1 playwright test -c apps/electron/e2e/playwright.config.ts",
     "verify": "env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm lint && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm typecheck && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm type-safety:check && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm arch:check && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm db:verify && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:backend && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:rtl && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:e2e",
     "prepare": "simple-git-hooks"
   },

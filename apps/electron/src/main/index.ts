@@ -48,10 +48,13 @@ const resolveRendererDist = (): string => {
   return path.resolve(process.cwd(), 'apps/renderer/dist');
 };
 
+const shouldHideWindow = (): boolean => process.env.E2E_HIDE_WINDOW === '1';
+
 const createMainWindow = async (): Promise<void> => {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    show: !shouldHideWindow(),
     webPreferences: {
       preload: path.resolve(__dirname, '../preload/index.js'),
       contextIsolation: true,
