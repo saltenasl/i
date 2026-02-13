@@ -11,6 +11,9 @@ importers:
       '@repo/api':
         specifier: workspace:*
         version: link:packages/api
+      '@repo/auto-extract':
+        specifier: workspace:*
+        version: link:packages/auto-extract
       '@repo/backend':
         specifier: workspace:*
         version: link:packages/backend
@@ -90,6 +93,8 @@ importers:
   apps/renderer: {}
 
   packages/api: {}
+
+  packages/auto-extract: {}
 
   packages/backend: {}
 

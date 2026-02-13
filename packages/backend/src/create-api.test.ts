@@ -91,4 +91,37 @@ describe('createBackendHandlers', () => {
 
     expect(createResult.error.code).toBe('VALIDATION_ERROR');
   });
+
+  it('runs extraction through the injected extraction dependency', async () => {
+    if (!harness) {
+      throw new Error('DB harness was not initialized.');
+    }
+
+    const handlers = createBackendHandlers({
+      db: harness.db,
+      runExtraction: async (text) => ({
+        title: 'Extracted',
+        memory: 'Keep local stack.',
+        items: [
+          {
+            label: 'tool',
+            value: 'llama.cpp',
+            start: text.indexOf('llama.cpp'),
+            end: text.indexOf('llama.cpp') + 'llama.cpp'.length,
+            confidence: 0.91,
+          },
+        ],
+        groups: [{ name: 'tools', itemIndexes: [0] }],
+      }),
+    });
+
+    const result = await handlers['extract.run']({ text: 'Use llama.cpp locally.' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.data.extraction.title).toBe('Extracted');
+    expect(result.data.extraction.items[0]?.value).toBe('llama.cpp');
+  });
 });

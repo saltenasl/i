@@ -15,6 +15,22 @@ export interface NoteDto {
   updatedAt: string;
 }
 
+export type Extraction = {
+  title: string;
+  memory?: string;
+  items: Array<{
+    label: string;
+    value: string;
+    start: number;
+    end: number;
+    confidence: number;
+  }>;
+  groups: Array<{
+    name: string;
+    itemIndexes: number[];
+  }>;
+};
+
 export interface ApiMethodMap {
   'health.ping': {
     input: Record<string, never>;
@@ -30,6 +46,12 @@ export interface ApiMethodMap {
       body?: string;
     };
     output: Result<{ note: NoteDto }, AppErrorCode>;
+  };
+  'extract.run': {
+    input: {
+      text: string;
+    };
+    output: Result<{ extraction: Extraction }, AppErrorCode>;
   };
 }
 

@@ -53,17 +53,23 @@ const launchApp = async (seedProfile: 'fresh' | 'baseline') => {
   };
 };
 
-test('fresh profile migrates and allows creating notes', async () => {
+test('fresh profile shows extract form and still allows creating notes', async () => {
   const launched = await launchApp('fresh');
 
   try {
     try {
-      await expect(launched.page.getByTestId('empty-state')).toBeVisible({ timeout: 15_000 });
+      await expect(launched.page.getByTestId('extract-text-input')).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(launched.page.getByTestId('extract-submit-button')).toBeVisible();
     } catch (error) {
       await dumpPageState(launched.page);
       throw error;
     }
 
+    await launched.page.getByTestId('nav-notes').click();
+
+    await expect(launched.page.getByTestId('empty-state')).toBeVisible();
     await launched.page.getByTestId('title-input').fill('E2E note');
     await launched.page.getByTestId('body-input').fill('Created through full Electron IPC stack.');
     await launched.page.getByTestId('create-button').click();
@@ -74,16 +80,21 @@ test('fresh profile migrates and allows creating notes', async () => {
   }
 });
 
-test('seeded profile loads baseline data', async () => {
+test('seeded profile loads baseline data on notes page', async () => {
   const launched = await launchApp('baseline');
 
   try {
     try {
-      await expect(launched.page.getByText('Seeded note')).toBeVisible({ timeout: 15_000 });
+      await expect(launched.page.getByTestId('extract-text-input')).toBeVisible({
+        timeout: 15_000,
+      });
     } catch (error) {
       await dumpPageState(launched.page);
       throw error;
     }
+
+    await launched.page.getByTestId('nav-notes').click();
+    await expect(launched.page.getByText('Seeded note')).toBeVisible({ timeout: 15_000 });
   } finally {
     await launched.cleanup();
   }

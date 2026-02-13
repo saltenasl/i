@@ -17,6 +17,8 @@ const invokeHandler = async (
       return handlers['notes.list'](request.input);
     case 'notes.create':
       return handlers['notes.create'](request.input);
+    case 'extract.run':
+      return handlers['extract.run'](request.input);
   }
 };
 

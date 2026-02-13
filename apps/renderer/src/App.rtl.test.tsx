@@ -36,6 +36,22 @@ describe('App (RTL with real backend implementation)', () => {
     await harness.close();
   });
 
+  it('shows extract form by default', async () => {
+    if (!harness) {
+      throw new Error('DB harness was not initialized.');
+    }
+
+    const api = createApiFromHandlers(createBackendHandlers({ db: harness.db }));
+    render(
+      <ApiProvider api={api}>
+        <App />
+      </ApiProvider>,
+    );
+
+    expect(await screen.findByTestId('extract-text-input')).toBeInTheDocument();
+    expect(screen.getByTestId('extract-submit-button')).toBeInTheDocument();
+  });
+
   it('creates and lists notes through the real backend implementation', async () => {
     if (!harness) {
       throw new Error('DB harness was not initialized.');
@@ -48,6 +64,8 @@ describe('App (RTL with real backend implementation)', () => {
         <App />
       </ApiProvider>,
     );
+
+    await user.click(await screen.findByTestId('nav-notes'));
 
     expect(await screen.findByTestId('empty-state')).toBeInTheDocument();
 
