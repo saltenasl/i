@@ -79,6 +79,7 @@
 - Commit convention: use `git commit --no-gpg-sign ...` by default.
 - Auto-extract convention: `@repo/auto-extract` uses a local llama.cpp binary and local GGUF model auto-downloaded into `~/.auto-extract` with a single public API `extract(text)` and no Python runtime dependency.
 - Package naming convention: all workspace packages must use the `@repo/*` scope prefix for consistency and tooling alignment.
+- Testing exception convention: for RTL/backend tests, `auto-extract` behavior may be mocked when needed for deterministic test coverage, with explicit user-approved intent documented in the test.
 
 ## Convention Intake Process
 When a new user convention appears:
