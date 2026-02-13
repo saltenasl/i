@@ -77,6 +77,7 @@
 - Type safety convention: enforcement is part of `pnpm verify`, not a best-effort guideline.
 - Delivery convention: finish requests with a commit whenever work is completed.
 - Commit convention: use `git commit --no-gpg-sign ...` by default.
+- Auto-extract convention: `auto-extract` uses a local llama.cpp binary and local GGUF model auto-downloaded into `~/.auto-extract` with a single public API `extract(text)` and no Python runtime dependency.
 
 ## Convention Intake Process
 When a new user convention appears:

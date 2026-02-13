@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "packages/api" },
+    { "path": "packages/auto-extract" },
     { "path": "packages/db" },
     { "path": "packages/backend" },
     { "path": "packages/test-utils" },

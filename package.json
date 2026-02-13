@@ -18,7 +18,7 @@
     "arch:check": "node --import tsx scripts/check-architecture.ts && node --import tsx scripts/check-no-mocks.ts",
     "db:generate-types": "node --import tsx packages/db/scripts/db-generate.ts",
     "db:verify": "node --import tsx packages/db/scripts/db-verify.ts && node --import tsx scripts/check-migration-discipline.ts",
-    "test:backend": "vitest run -c packages/db/vitest.config.ts && vitest run -c packages/backend/vitest.config.ts",
+    "test:backend": "vitest run -c packages/auto-extract/vitest.config.ts && vitest run -c packages/db/vitest.config.ts && vitest run -c packages/backend/vitest.config.ts",
     "test:rtl": "vitest run -c apps/renderer/vitest.config.ts",
     "test:e2e": "env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm build && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning E2E_HIDE_WINDOW=1 playwright test -c apps/electron/e2e/playwright.config.ts",
     "verify": "env -u NO_COLOR pnpm lint && env -u NO_COLOR pnpm typecheck && env -u NO_COLOR pnpm type-safety:check && env -u NO_COLOR pnpm arch:check && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm db:verify && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:backend && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:rtl && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:e2e",
@@ -29,6 +29,7 @@
     "@repo/backend": "workspace:*",
     "@repo/db": "workspace:*",
     "@repo/test-utils": "workspace:*",
+    "auto-extract": "workspace:*",
     "kysely": "^0.28.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
