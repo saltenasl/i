@@ -10,7 +10,9 @@
   "scripts": {
     "dev": "concurrently -k -n renderer,electron \"pnpm --filter @repo/renderer dev\" \"pnpm --filter @repo/electron dev\"",
     "build": "pnpm --filter @repo/renderer build && pnpm --filter @repo/electron build",
-    "run": "pnpm build && mkdir -p .local && APP_DB_PATH=$(pwd)/.local/app.sqlite RENDERER_DIST=$(pwd)/apps/renderer/dist electron apps/electron/dist/main/index.js",
+    "run": "pnpm build && mkdir -p .local && sh -c 'APP_DB_PATH=$(pwd)/.local/app.sqlite RENDERER_DIST=$(pwd)/apps/renderer/dist nohup electron apps/electron/dist/main/index.js > .local/electron.log 2>&1 & echo $! > .local/electron.pid' && echo \"Electron started in background (pid $(cat .local/electron.pid)). Logs: .local/electron.log\"",
+    "run:fg": "pnpm build && mkdir -p .local && APP_DB_PATH=$(pwd)/.local/app.sqlite RENDERER_DIST=$(pwd)/apps/renderer/dist electron apps/electron/dist/main/index.js",
+    "run:stop": "if [ -f .local/electron.pid ]; then kill $(cat .local/electron.pid) && rm -f .local/electron.pid && echo \"Electron stopped.\"; else echo \"No PID file found at .local/electron.pid\"; fi",
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
