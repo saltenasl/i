@@ -1,0 +1,12 @@
+{
+  "name": "@repo/electron",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/main/index.js",
+  "types": "src/main/index.ts",
+  "scripts": {
+    "dev": "ELECTRON_RENDERER_URL=http://127.0.0.1:5173 electron-vite dev",
+    "build": "electron-vite build"
+  }
+}

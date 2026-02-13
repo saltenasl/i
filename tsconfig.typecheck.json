@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "baseUrl": ".",
+    "jsx": "react-jsx",
+    "paths": {
+      "@repo/api": ["packages/api/src/index.ts"],
+      "@repo/backend": ["packages/backend/src/index.ts"],
+      "@repo/db": ["packages/db/src/index.ts"],
+      "@repo/test-utils": ["packages/test-utils/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/**/*.ts",
+    "packages/**/*.tsx",
+    "apps/**/*.ts",
+    "apps/**/*.tsx",
+    "scripts/**/*.ts"
+  ],
+  "exclude": ["**/dist/**", "node_modules"]
+}

@@ -1,0 +1,58 @@
+{
+  "name": "agents-first-electron-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "dev": "concurrently -k -n renderer,electron \"pnpm --filter @repo/renderer dev\" \"pnpm --filter @repo/electron dev\"",
+    "build": "pnpm --filter @repo/renderer build && pnpm --filter @repo/electron build",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
+    "type-safety:check": "node --import tsx scripts/check-type-safety.ts",
+    "arch:check": "node --import tsx scripts/check-architecture.ts && node --import tsx scripts/check-no-mocks.ts",
+    "db:generate-types": "node --import tsx packages/db/scripts/db-generate.ts",
+    "db:verify": "node --import tsx packages/db/scripts/db-verify.ts && node --import tsx scripts/check-migration-discipline.ts",
+    "test:backend": "vitest run -c packages/db/vitest.config.ts && vitest run -c packages/backend/vitest.config.ts",
+    "test:rtl": "vitest run -c apps/renderer/vitest.config.ts",
+    "test:e2e": "env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm build && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning playwright test -c apps/electron/e2e/playwright.config.ts",
+    "verify": "env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm lint && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm typecheck && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm type-safety:check && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm arch:check && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm db:verify && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:backend && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:rtl && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:e2e",
+    "prepare": "simple-git-hooks"
+  },
+  "dependencies": {
+    "@repo/api": "workspace:*",
+    "@repo/backend": "workspace:*",
+    "@repo/db": "workspace:*",
+    "@repo/test-utils": "workspace:*",
+    "kysely": "^0.28.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@playwright/test": "^1.52.0",
+    "@types/node": "^22.15.30",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.5",
+    "@vitejs/plugin-react": "^4.4.1",
+    "concurrently": "^9.1.2",
+    "electron": "^35.0.0",
+    "electron-vite": "^3.1.0",
+    "jsdom": "^26.1.0",
+    "simple-git-hooks": "^2.13.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.4"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm verify"
+  }
+}

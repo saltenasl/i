@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/api" },
+    { "path": "packages/db" },
+    { "path": "packages/backend" },
+    { "path": "packages/test-utils" },
+    { "path": "apps/renderer" },
+    { "path": "apps/electron" }
+  ]
+}

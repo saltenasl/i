@@ -1,0 +1,17 @@
+node_modules
+.DS_Store
+coverage
+playwright-report
+apps/electron/test-results
+blob-report
+.vitest
+*.tsbuildinfo
+apps/renderer/dist
+apps/electron/dist
+packages/*/dist
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+.tmp
+.npm-cache
+.pnpm-store
