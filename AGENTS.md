@@ -10,6 +10,7 @@
 - Commits must be self-contained and complete.
 - Never commit unfinished feature/task/bug states.
 - Always commit completed work before finishing a user request.
+- Use `--no-gpg-sign` for commits in this repository workflow.
 - Mocking in tests is forbidden unless the user explicitly approves it for the current task.
 - Do not override explicit user decisions without asking for permission first.
 - Keep solutions minimal, robust, and future-proof.
@@ -75,6 +76,7 @@
 - Collaboration convention: if implementation issues suggest reversing a user-selected tool/approach, pause and request approval before changing it.
 - Type safety convention: enforcement is part of `pnpm verify`, not a best-effort guideline.
 - Delivery convention: finish requests with a commit whenever work is completed.
+- Commit convention: use `git commit --no-gpg-sign ...` by default.
 
 ## Convention Intake Process
 When a new user convention appears:
