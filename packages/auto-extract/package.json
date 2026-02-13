@@ -1,5 +1,5 @@
 {
-  "name": "auto-extract",
+  "name": "@repo/auto-extract",
   "version": "0.1.0",
   "private": true,
   "type": "module",

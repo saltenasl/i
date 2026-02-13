@@ -13,7 +13,7 @@
       "@repo/backend": ["packages/backend/src/index.ts"],
       "@repo/db": ["packages/db/src/index.ts"],
       "@repo/test-utils": ["packages/test-utils/src/index.ts"],
-      "auto-extract": ["packages/auto-extract/src/index.ts"]
+      "@repo/auto-extract": ["packages/auto-extract/src/index.ts"]
     }
   },
   "include": [

@@ -77,7 +77,8 @@
 - Type safety convention: enforcement is part of `pnpm verify`, not a best-effort guideline.
 - Delivery convention: finish requests with a commit whenever work is completed.
 - Commit convention: use `git commit --no-gpg-sign ...` by default.
-- Auto-extract convention: `auto-extract` uses a local llama.cpp binary and local GGUF model auto-downloaded into `~/.auto-extract` with a single public API `extract(text)` and no Python runtime dependency.
+- Auto-extract convention: `@repo/auto-extract` uses a local llama.cpp binary and local GGUF model auto-downloaded into `~/.auto-extract` with a single public API `extract(text)` and no Python runtime dependency.
+- Package naming convention: all workspace packages must use the `@repo/*` scope prefix for consistency and tooling alignment.
 
 ## Convention Intake Process
 When a new user convention appears:

@@ -1,11 +1,11 @@
-# auto-extract
+# @repo/auto-extract
 
-`auto-extract` provides LangExtract-like extraction by spawning a local `llama.cpp` binary and validating strict grounding (`value === text.slice(start, end)`) before returning typed output.
+`@repo/auto-extract` provides LangExtract-like extraction by spawning a local `llama.cpp` binary and validating strict grounding (`value === text.slice(start, end)`) before returning typed output.
 
 ## Usage
 
 ```ts
-import { extract } from "auto-extract";
+import { extract } from "@repo/auto-extract";
 
 const result = await extract("...");
 ```
