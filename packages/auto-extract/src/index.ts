@@ -7,7 +7,6 @@ import { generateText } from 'ai';
 import { ensureAssets } from './assets.js';
 import { buildPromptV2, buildSystemPromptV2, buildUserPromptV2 } from './prompt.js';
 import type {
-  EntityType,
   Extraction,
   ExtractionDebug,
   ExtractionV2,
@@ -363,16 +362,7 @@ const finalizeExtractionBundle = (
   return { extraction, extractionV2, debug };
 };
 
-const findSpan = (text: string, value: string): Span | null => {
-  const start = text.indexOf(value);
-  if (start < 0) {
-    return null;
-  }
-  return { start, end: start + value.length };
-};
-
-const findFirstPronounSpan = (text: string): Span | null => {
-  const match = /\b(?:I|i|me|my|mine|we|our|us)\b/.exec(text);
+const spanFromRegexMatch = (match: RegExpExecArray | null): Span | null => {
   if (!match || match.index === undefined) {
     return null;
   }
@@ -381,6 +371,15 @@ const findFirstPronounSpan = (text: string): Span | null => {
     start: match.index,
     end: match.index + match[0].length,
   };
+};
+
+const findPreferredNarratorSpan = (text: string): Span | null => {
+  const singular = spanFromRegexMatch(/\b(?:I|i|me|my|mine)\b/.exec(text));
+  if (singular) {
+    return singular;
+  }
+
+  return spanFromRegexMatch(/\b(?:we|our|us)\b/.exec(text));
 };
 
 const isNarratorPronoun = (value: string): boolean => {
@@ -399,15 +398,6 @@ const isNarratorEntity = (entity: ExtractionV2['entities'][number]): boolean => 
   return entity.context?.toLowerCase().includes('narrator') ?? false;
 };
 
-const nextEntityId = (entities: ExtractionV2['entities']): string => {
-  const seen = new Set(entities.map((entity) => entity.id));
-  let value = entities.length + 1;
-  while (seen.has(`ent_${value}`)) {
-    value += 1;
-  }
-  return `ent_${value}`;
-};
-
 const nextFactId = (facts: ExtractionV2['facts']): string => {
   const seen = new Set(facts.map((fact) => fact.id));
   let value = facts.length + 1;
@@ -415,65 +405,6 @@ const nextFactId = (facts: ExtractionV2['facts']): string => {
     value += 1;
   }
   return `fact_${value}`;
-};
-
-const addEntity = (
-  entities: ExtractionV2['entities'],
-  text: string,
-  name: string,
-  type: EntityType,
-  context?: string,
-): string | null => {
-  const span = findSpan(text, name);
-  if (!span) {
-    return null;
-  }
-
-  const id = `ent_${entities.length + 1}`;
-  entities.push({
-    id,
-    name,
-    type,
-    nameStart: span.start,
-    nameEnd: span.end,
-    ...(context ? { context } : {}),
-    confidence: 0.7,
-  });
-
-  return id;
-};
-
-const addFact = (
-  facts: ExtractionV2['facts'],
-  text: string,
-  predicate: string,
-  evidenceValue: string,
-  ownerEntityId: string,
-  perspective: FactPerspective,
-  subjectEntityId?: string,
-  objectEntityId?: string,
-  objectText?: string,
-): string | null => {
-  const span = findSpan(text, evidenceValue);
-  if (!span) {
-    return null;
-  }
-
-  const id = `fact_${facts.length + 1}`;
-  facts.push({
-    id,
-    ownerEntityId,
-    perspective,
-    predicate,
-    ...(subjectEntityId ? { subjectEntityId } : {}),
-    ...(objectEntityId ? { objectEntityId } : {}),
-    ...(objectText ? { objectText } : {}),
-    evidenceStart: span.start,
-    evidenceEnd: span.end,
-    confidence: 0.65,
-  });
-
-  return id;
 };
 
 const deriveFactSentiment = (fact: ExtractionV2['facts'][number], text: string): NoteSentiment => {
@@ -534,14 +465,14 @@ const ensureSelfOwnership = (extraction: ExtractionV2, text: string): Extraction
 
   let selfEntity = dedupedEntities.find((entity) => isNarratorEntity(entity));
 
-  const pronounSpan = findFirstPronounSpan(text);
-  if (!selfEntity && pronounSpan) {
+  const narratorSpan = findPreferredNarratorSpan(text);
+  if (!selfEntity && narratorSpan) {
     selfEntity = {
       id: NARRATOR_ENTITY_ID,
-      name: text.slice(pronounSpan.start, pronounSpan.end),
+      name: text.slice(narratorSpan.start, narratorSpan.end),
       type: 'person',
-      nameStart: pronounSpan.start,
-      nameEnd: pronounSpan.end,
+      nameStart: narratorSpan.start,
+      nameEnd: narratorSpan.end,
       context: 'narrator',
       confidence: 0.75,
     };
@@ -550,9 +481,24 @@ const ensureSelfOwnership = (extraction: ExtractionV2, text: string): Extraction
   const oldSelfId = selfEntity?.id;
   const entities = dedupedEntities.filter((entity) => !isNarratorEntity(entity));
   if (selfEntity) {
+    const normalizedSelfSpan =
+      narratorSpan ??
+      (selfEntity.nameStart >= 0 &&
+      selfEntity.nameEnd > selfEntity.nameStart &&
+      selfEntity.nameEnd <= text.length
+        ? { start: selfEntity.nameStart, end: selfEntity.nameEnd }
+        : null);
+
     entities.push({
       ...selfEntity,
       id: NARRATOR_ENTITY_ID,
+      ...(normalizedSelfSpan
+        ? {
+            name: text.slice(normalizedSelfSpan.start, normalizedSelfSpan.end),
+            nameStart: normalizedSelfSpan.start,
+            nameEnd: normalizedSelfSpan.end,
+          }
+        : {}),
       context: selfEntity.context?.toLowerCase().includes('narrator')
         ? selfEntity.context
         : selfEntity.context
@@ -623,17 +569,25 @@ const ensureSelfOwnership = (extraction: ExtractionV2, text: string): Extraction
     ];
   });
 
-  const relations = extraction.relations.map((relation) => ({
-    ...relation,
-    fromEntityId: remapEntityId(relation.fromEntityId) ?? relation.fromEntityId,
-    toEntityId: remapEntityId(relation.toEntityId) ?? relation.toEntityId,
-  }));
+  const factIdSet = new Set(facts.map((fact) => fact.id));
+
+  const relations = extraction.relations.flatMap((relation) => {
+    const fromEntityId = remapEntityId(relation.fromEntityId) ?? relation.fromEntityId;
+    const toEntityId = remapEntityId(relation.toEntityId) ?? relation.toEntityId;
+
+    if (!entityIdSet.has(fromEntityId) || !entityIdSet.has(toEntityId)) {
+      return [];
+    }
+
+    return [{ ...relation, fromEntityId, toEntityId }];
+  });
 
   const groups = extraction.groups.map((group) => ({
     ...group,
     entityIds: Array.from(
       new Set(group.entityIds.map((entityId) => remapEntityId(entityId) ?? entityId)),
     ),
+    factIds: group.factIds.filter((factId) => factIdSet.has(factId)),
   }));
 
   const segments = extraction.segments.map((segment) => ({
@@ -641,6 +595,7 @@ const ensureSelfOwnership = (extraction: ExtractionV2, text: string): Extraction
     entityIds: Array.from(
       new Set(segment.entityIds.map((entityId) => remapEntityId(entityId) ?? entityId)),
     ),
+    factIds: segment.factIds.filter((factId) => factIdSet.has(factId)),
   }));
 
   return {
@@ -651,6 +606,66 @@ const ensureSelfOwnership = (extraction: ExtractionV2, text: string): Extraction
     groups,
     segments,
   };
+};
+
+const isDrivingPredicate = (predicate: string): boolean => {
+  return /\bdriv(?:e|ing)\b/i.test(predicate);
+};
+
+const removeConflictingCollectiveDrivingFacts = (
+  extraction: ExtractionV2,
+  text: string,
+): ExtractionV2 => {
+  const hasExplicitOtherDriver = extraction.facts.some(
+    (fact) => fact.ownerEntityId !== NARRATOR_ENTITY_ID && isDrivingPredicate(fact.predicate),
+  );
+
+  if (!hasExplicitOtherDriver) {
+    return extraction;
+  }
+
+  const facts = extraction.facts.filter((fact) => {
+    if (fact.ownerEntityId !== NARRATOR_ENTITY_ID || !isDrivingPredicate(fact.predicate)) {
+      return true;
+    }
+
+    const evidence = text.slice(fact.evidenceStart, fact.evidenceEnd);
+    const explicitSelfDriver = /^\s*(?:i|i'm|ive|i’ve)\s+(?:was\s+)?driv(?:e|ing)\b/i.test(
+      evidence,
+    );
+    if (explicitSelfDriver) {
+      return true;
+    }
+
+    const collectivePronounDriver = /^\s*(?:we|our|us)\s+(?:were\s+)?driv(?:e|ing)\b/i.test(
+      evidence,
+    );
+    return !collectivePronounDriver;
+  });
+
+  if (facts.length === extraction.facts.length) {
+    return extraction;
+  }
+
+  const factIdSet = new Set(facts.map((fact) => fact.id));
+  return {
+    ...extraction,
+    facts,
+    groups: extraction.groups.map((group) => ({
+      ...group,
+      factIds: group.factIds.filter((factId) => factIdSet.has(factId)),
+    })),
+    segments: extraction.segments.map((segment) => ({
+      ...segment,
+      factIds: segment.factIds.filter((factId) => factIdSet.has(factId)),
+    })),
+  };
+};
+
+export const postProcessExtractionV2 = (extraction: ExtractionV2, text: string): ExtractionV2 => {
+  const owned = ensureSelfOwnership(extraction, text);
+  const withTodos = enrichTodoFacts(owned, text);
+  return removeConflictingCollectiveDrivingFacts(withTodos, text);
 };
 
 const enrichTodoFacts = (extraction: ExtractionV2, text: string): ExtractionV2 => {
@@ -712,155 +727,6 @@ const enrichTodoFacts = (extraction: ExtractionV2, text: string): ExtractionV2 =
   };
 };
 
-const buildFallbackExtractionV2 = (text: string): ExtractionV2 => {
-  const entities: ExtractionV2['entities'] = [];
-  const facts: ExtractionV2['facts'] = [];
-  const relations: ExtractionV2['relations'] = [];
-
-  const selfSpan = findFirstPronounSpan(text);
-  const selfId = selfSpan
-    ? (() => {
-        const id = NARRATOR_ENTITY_ID;
-        entities.push({
-          id,
-          name: text.slice(selfSpan.start, selfSpan.end),
-          type: 'person',
-          nameStart: selfSpan.start,
-          nameEnd: selfSpan.end,
-          context: 'narrator',
-          confidence: 0.75,
-        });
-        return id;
-      })()
-    : null;
-
-  const egleId = addEntity(entities, text, 'Egle', 'person', 'was driving and felt scared');
-  const klaipedaId = addEntity(entities, text, 'Klaipeda', 'place', 'location with heavy snow');
-  const seasideId = addEntity(entities, text, 'seaside', 'place', 'childhood white dunes memory');
-  const iceId = addEntity(entities, text, 'ice', 'event', 'hazard on the highway');
-
-  const droveFact = egleId
-    ? addFact(
-        facts,
-        text,
-        'was driving',
-        'Egle was driving',
-        egleId,
-        'other',
-        egleId,
-        klaipedaId ?? undefined,
-      )
-    : null;
-
-  const scaredFact = egleId
-    ? addFact(
-        facts,
-        text,
-        'was scared',
-        'she was scared',
-        egleId,
-        'other',
-        egleId,
-        iceId ?? undefined,
-      )
-    : null;
-
-  const callFact = selfId
-    ? addFact(
-        facts,
-        text,
-        'called road maintenance',
-        'I called the people maintaining the road',
-        selfId,
-        'self',
-        selfId,
-      )
-    : null;
-
-  const snowFact = klaipedaId
-    ? addFact(
-        facts,
-        text,
-        'observed heavy snow',
-        'ton of snow here in Klaipeda',
-        selfId ?? klaipedaId,
-        selfId ? 'self' : 'uncertain',
-        selfId ?? undefined,
-        klaipedaId,
-      )
-    : null;
-
-  const memoryFact = selfId
-    ? addFact(
-        facts,
-        text,
-        'recalled childhood memory',
-        'when I was a kid the seaside had so much snow it was all white dunes',
-        selfId,
-        'self',
-        selfId,
-        seasideId ?? undefined,
-        'white dunes memory',
-      )
-    : null;
-
-  if (egleId && klaipedaId && droveFact) {
-    relations.push({
-      fromEntityId: egleId,
-      toEntityId: klaipedaId,
-      type: 'was driving in',
-      confidence: 0.7,
-    });
-  }
-
-  if (egleId && iceId && scaredFact) {
-    relations.push({
-      fromEntityId: egleId,
-      toEntityId: iceId,
-      type: 'was scared because of',
-      confidence: 0.68,
-    });
-  }
-
-  const raw: ExtractionV2 = {
-    title: 'Winter Road Note',
-    noteType: 'personal',
-    summary: 'I recorded a winter driving event with safety concerns and a childhood snow memory.',
-    language: 'en',
-    date: null,
-    sentiment: 'neutral',
-    emotions: [
-      { emotion: 'concern', intensity: 4 },
-      { emotion: 'uncertainty', intensity: 3 },
-    ],
-    entities,
-    facts,
-    relations,
-    groups: [
-      {
-        name: 'people',
-        entityIds: [selfId, egleId].filter((value): value is string => Boolean(value)),
-        factIds: [droveFact, scaredFact, callFact].filter((value): value is string =>
-          Boolean(value),
-        ),
-      },
-      {
-        name: 'places',
-        entityIds: [klaipedaId, seasideId].filter((value): value is string => Boolean(value)),
-        factIds: [snowFact, memoryFact].filter((value): value is string => Boolean(value)),
-      },
-      {
-        name: 'events',
-        entityIds: [iceId].filter((value): value is string => Boolean(value)),
-        factIds: [scaredFact].filter((value): value is string => Boolean(value)),
-      },
-    ],
-    segments: [],
-  };
-
-  return deriveSegments(enrichTodoFacts(ensureSelfOwnership(raw, text), text), text).extraction;
-};
-
 const laneMeta: Record<
   ExtractionLaneId,
   { provider: ExtractionLaneResult['provider']; model: string; envKey?: string }
@@ -912,7 +778,7 @@ const runCloudExtractionBundle = async (
 
     rawModelOutput = completion.text;
     const parsed = parseAndValidateExtractionV2Output(text, rawModelOutput);
-    validated = enrichTodoFacts(ensureSelfOwnership(parsed, text), text);
+    validated = postProcessExtractionV2(parsed, text);
 
     if (validated.entities.length === 0 && validated.facts.length === 0) {
       throw new Error('Model output had no entities/facts.');
@@ -1031,25 +897,24 @@ export async function extractWithDebug(text: string): Promise<{
   const prompt = buildPromptV2(text);
   const errors: string[] = [];
   let rawModelOutput = '';
-  let fallbackUsed = false;
 
   const runtime = await getRuntime();
-
-  let validated = buildFallbackExtractionV2(text);
+  let validated: ExtractionV2 | null = null;
 
   try {
     rawModelOutput = await runLlamaCompletion(prompt, FAST_OUTPUT_TOKENS);
     const parsed = parseAndValidateExtractionV2Output(text, rawModelOutput);
-    validated = enrichTodoFacts(ensureSelfOwnership(parsed, text), text);
+    validated = postProcessExtractionV2(parsed, text);
     if (validated.entities.length === 0 && validated.facts.length === 0) {
-      fallbackUsed = true;
-      validated = buildFallbackExtractionV2(text);
-      errors.push('Model output had no entities/facts.');
+      throw new Error('Model output had no entities/facts.');
     }
   } catch (error) {
-    fallbackUsed = true;
     errors.push(error instanceof Error ? error.message : String(error));
-    validated = buildFallbackExtractionV2(text);
+    throw new Error(errors.join(' | '));
+  }
+
+  if (!validated) {
+    throw new Error('Extraction validation failed with no parsed result.');
   }
 
   return finalizeExtractionBundle(
@@ -1064,7 +929,7 @@ export async function extractWithDebug(text: string): Promise<{
       nPredict: FAST_OUTPUT_TOKENS,
       totalMs: 0,
     },
-    fallbackUsed,
+    false,
     errors,
   );
 }
@@ -1107,20 +972,6 @@ export async function extractCompareLane(
       laneId === 'local-llama'
         ? await extractWithDebug(text)
         : await runCloudExtractionBundle(text, laneId);
-
-    if (bundle.debug.fallbackUsed) {
-      return {
-        laneId,
-        provider: lane.provider,
-        model: lane.model,
-        status: 'error',
-        durationMs: Date.now() - startedAt,
-        extraction: bundle.extraction,
-        extractionV2: bundle.extractionV2,
-        debug: bundle.debug,
-        errorMessage: bundle.debug.errors[0] ?? 'Fallback extraction was used.',
-      };
-    }
 
     return {
       laneId,

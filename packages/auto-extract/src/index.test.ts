@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { postProcessExtractionV2 } from './index.js';
 import type { Extraction, ExtractionV2 } from './types.js';
 import {
   normalizeGroupsV2,
@@ -293,5 +294,104 @@ describe('parseAndValidateExtractionOutput', () => {
     expect(() => parseAndValidateExtractionOutput(SOURCE_TEXT, 'not json')).toThrow(
       /not valid json/i,
     );
+  });
+});
+
+describe('postProcessExtractionV2', () => {
+  it('prefers singular narrator anchor and resolves unresolved self ownership', () => {
+    const text = 'we were driving and there was ice. I called support. Egle was driving.';
+    const weStart = text.indexOf('we');
+    const iStart = text.indexOf('I called');
+    const egleStart = text.indexOf('Egle');
+    const weDrivingStart = text.indexOf('we were driving');
+    const callStart = text.indexOf('I called support');
+    const egleDrivingStart = text.indexOf('Egle was driving');
+
+    if (
+      weStart < 0 ||
+      iStart < 0 ||
+      egleStart < 0 ||
+      weDrivingStart < 0 ||
+      callStart < 0 ||
+      egleDrivingStart < 0
+    ) {
+      throw new Error('Expected narrator/driver fixtures to exist in source text.');
+    }
+
+    const raw: ExtractionV2 = {
+      title: 'Drive note',
+      noteType: 'personal',
+      summary: 'We drove and I called support while Egle drove.',
+      language: 'en',
+      date: null,
+      sentiment: 'neutral',
+      emotions: [],
+      entities: [
+        {
+          id: 'ent_we',
+          name: 'we',
+          type: 'person',
+          nameStart: weStart,
+          nameEnd: weStart + 2,
+          context: 'narrator',
+          confidence: 0.8,
+        },
+        {
+          id: 'ent_egle',
+          name: 'Egle',
+          type: 'person',
+          nameStart: egleStart,
+          nameEnd: egleStart + 4,
+          confidence: 0.9,
+        },
+      ],
+      facts: [
+        {
+          id: 'fact-self-driving',
+          ownerEntityId: 'ent_we',
+          perspective: 'self',
+          predicate: 'was driving',
+          evidenceStart: weDrivingStart,
+          evidenceEnd: weDrivingStart + 'we were driving'.length,
+          confidence: 0.8,
+        },
+        {
+          id: 'fact-call',
+          ownerEntityId: 'unresolved_owner_2',
+          perspective: 'self',
+          predicate: 'called support',
+          evidenceStart: callStart,
+          evidenceEnd: callStart + 'I called support'.length,
+          confidence: 0.8,
+        },
+        {
+          id: 'fact-egle-driving',
+          ownerEntityId: 'ent_egle',
+          perspective: 'other',
+          predicate: 'was driving',
+          evidenceStart: egleDrivingStart,
+          evidenceEnd: egleDrivingStart + 'Egle was driving'.length,
+          confidence: 0.85,
+        },
+      ],
+      relations: [],
+      groups: [
+        {
+          name: 'people',
+          entityIds: ['ent_we', 'ent_egle'],
+          factIds: ['fact-self-driving', 'fact-call', 'fact-egle-driving'],
+        },
+      ],
+      segments: [],
+    };
+
+    const result = postProcessExtractionV2(raw, text);
+    const narrator = result.entities.find((entity) => entity.id === 'ent_self');
+    const callFact = result.facts.find((fact) => fact.id === 'fact-call');
+    const selfDrivingFact = result.facts.find((fact) => fact.id === 'fact-self-driving');
+
+    expect(narrator?.name).toBe('I');
+    expect(callFact?.ownerEntityId).toBe('ent_self');
+    expect(selfDrivingFact).toBeUndefined();
   });
 });
