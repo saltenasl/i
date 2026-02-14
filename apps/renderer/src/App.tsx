@@ -131,7 +131,56 @@ const NotesPage = () => {
   );
 };
 
-const ExtractionView = ({ extraction }: { extraction: Extraction }) => {
+const getHighlightColor = (index: number): string => {
+  const colors = ['#fff3bf', '#d3f9d8', '#d0ebff', '#ffd8a8', '#e5dbff', '#ffc9c9'];
+  return colors[index % colors.length] ?? '#fff3bf';
+};
+
+const buildHighlightedChunks = (
+  text: string,
+  extraction: Extraction,
+): Array<{ key: string; text: string; itemIndex: number | null }> => {
+  const sorted = extraction.items
+    .map((item, index) => ({ ...item, index }))
+    .sort((a, b) => a.start - b.start);
+
+  const chunks: Array<{ key: string; text: string; itemIndex: number | null }> = [];
+  let cursor = 0;
+  let plainChunkCount = 0;
+
+  for (const item of sorted) {
+    if (item.start > cursor) {
+      chunks.push({
+        key: `plain-${plainChunkCount}-${cursor}-${item.start}`,
+        text: text.slice(cursor, item.start),
+        itemIndex: null,
+      });
+      plainChunkCount += 1;
+    }
+
+    chunks.push({
+      key: `item-${item.index}-${item.start}-${item.end}`,
+      text: text.slice(item.start, item.end),
+      itemIndex: item.index,
+    });
+    cursor = item.end;
+  }
+
+  if (cursor < text.length) {
+    chunks.push({
+      key: `plain-${plainChunkCount}-${cursor}-${text.length}`,
+      text: text.slice(cursor),
+      itemIndex: null,
+    });
+  }
+
+  return chunks;
+};
+
+const ExtractionView = ({
+  extraction,
+  sourceText,
+}: { extraction: Extraction; sourceText: string }) => {
   const groupedItems = useMemo(() => {
     return extraction.groups.map((group) => ({
       ...group,
@@ -139,12 +188,95 @@ const ExtractionView = ({ extraction }: { extraction: Extraction }) => {
     }));
   }, [extraction]);
 
+  const highlightedChunks = useMemo(
+    () => buildHighlightedChunks(sourceText, extraction),
+    [sourceText, extraction],
+  );
+
+  const groupedItemIndexes = useMemo(() => {
+    return new Set(groupedItems.flatMap((group) => group.itemIndexes));
+  }, [groupedItems]);
+
   return (
-    <section data-testid="extraction-result">
-      <h2 data-testid="extraction-title">{extraction.title}</h2>
+    <section
+      data-testid="extraction-result"
+      style={{ border: '1px solid #d0d7de', borderRadius: 10, padding: 16, marginTop: 20 }}
+    >
+      <h2 data-testid="extraction-title" style={{ marginTop: 0 }}>
+        {extraction.title}
+      </h2>
       {extraction.memory ? <p data-testid="extraction-memory">{extraction.memory}</p> : null}
 
-      <h3>Items</h3>
+      <h3 style={{ marginBottom: 8 }}>What Was Found</h3>
+      <div
+        style={{
+          border: '1px solid #d0d7de',
+          borderRadius: 8,
+          padding: 12,
+          background: '#fafbfc',
+          lineHeight: 1.5,
+          whiteSpace: 'pre-wrap',
+        }}
+      >
+        {highlightedChunks.map((chunk) => {
+          if (chunk.itemIndex === null) {
+            return <span key={chunk.key}>{chunk.text}</span>;
+          }
+
+          const item = extraction.items[chunk.itemIndex];
+          if (!item) {
+            return <span key={chunk.key}>{chunk.text}</span>;
+          }
+
+          return (
+            <span
+              key={chunk.key}
+              title={`${item.label} (${item.start}-${item.end})`}
+              style={{
+                background: getHighlightColor(chunk.itemIndex),
+                borderRadius: 4,
+                padding: '1px 2px',
+              }}
+            >
+              {chunk.text}
+            </span>
+          );
+        })}
+      </div>
+
+      <h3 style={{ marginTop: 16 }}>Items</h3>
+      <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
+        {extraction.items.map((item, index) => (
+          <div
+            key={`${item.label}-${item.start}-${item.end}-${index}`}
+            style={{
+              border: '1px solid #d0d7de',
+              borderRadius: 8,
+              padding: 8,
+              display: 'grid',
+              gridTemplateColumns: '1fr auto',
+              gap: 6,
+            }}
+          >
+            <div>
+              <strong>{item.label}</strong>{' '}
+              <span style={{ opacity: 0.8 }}>
+                ({item.start}-{item.end})
+              </span>
+            </div>
+            <div style={{ fontVariantNumeric: 'tabular-nums' }}>{item.confidence.toFixed(2)}</div>
+            <div
+              style={{
+                gridColumn: '1 / span 2',
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+              }}
+            >
+              {item.value}
+            </div>
+          </div>
+        ))}
+      </div>
+
       <table data-testid="extraction-items-table">
         <thead>
           <tr>
@@ -169,13 +301,51 @@ const ExtractionView = ({ extraction }: { extraction: Extraction }) => {
       </table>
 
       <h3>Groups</h3>
-      <ul data-testid="extraction-groups-list">
+      <ul data-testid="extraction-groups-list" style={{ display: 'grid', gap: 8 }}>
         {groupedItems.map((group, groupIndex) => (
           <li key={`${group.name}-${groupIndex}`}>
-            <strong>{group.name}</strong>: {group.labels.join(', ')}
+            <strong>{group.name}</strong>:{' '}
+            {group.labels.map((label, labelIndex) => (
+              <span
+                key={`${group.name}-${label}-${labelIndex}`}
+                style={{
+                  display: 'inline-block',
+                  marginRight: 6,
+                  marginTop: 4,
+                  padding: '2px 8px',
+                  borderRadius: 999,
+                  border: '1px solid #cdd9e5',
+                  background: '#f6f8fa',
+                }}
+              >
+                {label}
+              </span>
+            ))}
           </li>
         ))}
       </ul>
+
+      <p style={{ marginTop: 12, fontSize: 13, opacity: 0.8 }}>
+        Grouped items: {groupedItemIndexes.size}/{extraction.items.length}
+      </p>
+
+      <details style={{ marginTop: 10 }}>
+        <summary>Raw JSON</summary>
+        <pre
+          data-testid="extraction-raw-json"
+          style={{
+            marginTop: 10,
+            padding: 10,
+            borderRadius: 8,
+            border: '1px solid #d0d7de',
+            background: '#0d1117',
+            color: '#e6edf3',
+            overflowX: 'auto',
+          }}
+        >
+          {JSON.stringify(extraction, null, 2)}
+        </pre>
+      </details>
     </section>
   );
 };
@@ -244,7 +414,7 @@ const ExtractPage = () => {
         </p>
       ) : null}
 
-      {result ? <ExtractionView extraction={result} /> : null}
+      {result ? <ExtractionView extraction={result} sourceText={text} /> : null}
     </section>
   );
 };
