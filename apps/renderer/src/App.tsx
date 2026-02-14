@@ -139,99 +139,49 @@ const NotesPage = () => {
   );
 };
 
-const entityColorPalette = [
-  '#fff3bf',
-  '#d3f9d8',
-  '#d0ebff',
-  '#ffd8a8',
-  '#e5dbff',
-  '#ffc9c9',
-  '#c5f6fa',
-  '#ffe3e3',
-];
+const getGlobalColor = (index: number): string => {
+  const hue = (index * 137.508) % 360;
+  return `hsl(${hue} 75% 85%)`;
+};
 
-const getEntityColor = (index: number): string => {
-  return entityColorPalette[index % entityColorPalette.length] ?? '#fff3bf';
+const getRelationKey = (relation: ExtractionV2['relations'][number], index: number): string => {
+  return `${relation.fromEntityId}-${relation.toEntityId}-${relation.type}-${index}`;
+};
+
+type SourceEntitySpan = {
+  id: string;
+  start: number;
+  end: number;
+};
+
+type SourceOverlaySpan = {
+  id: string;
+  start: number;
+  end: number;
+  color: string;
+};
+
+type SourceChunk = {
+  key: string;
+  text: string;
+  entityId: string | null;
+  entityColor: string | null;
+  overlayColor: string | null;
+  involved: boolean;
 };
 
 const buildSourceChunks = (
   text: string,
-  extractionV2: ExtractionV2,
-  activeEntityId: string | null,
-): Array<{ key: string; text: string; entityId: string | null; involved: boolean }> => {
-  const entitySpans = extractionV2.entities
-    .map((entity) => ({ id: entity.id, start: entity.nameStart, end: entity.nameEnd }))
-    .filter((span) => span.start >= 0 && span.end > span.start && span.end <= text.length);
-
-  const activeEntity = extractionV2.entities.find((entity) => entity.id === activeEntityId);
-  const activeEntityName = activeEntity?.name.trim().toLowerCase() ?? '';
-  const lowerText = text.toLowerCase();
-
-  const involvementSpans =
-    activeEntityId === null
-      ? []
-      : [
-          ...extractionV2.facts
-            .filter(
-              (fact) =>
-                fact.ownerEntityId === activeEntityId ||
-                fact.subjectEntityId === activeEntityId ||
-                fact.objectEntityId === activeEntityId,
-            )
-            .flatMap((fact) => {
-              const evidence = text.slice(fact.evidenceStart, fact.evidenceEnd).toLowerCase();
-              if (activeEntityName && evidence.includes(activeEntityName)) {
-                return [{ start: fact.evidenceStart, end: fact.evidenceEnd }];
-              }
-              if (!activeEntityName) {
-                return [{ start: fact.evidenceStart, end: fact.evidenceEnd }];
-              }
-
-              const nearest = (() => {
-                let from = 0;
-                let bestStart = -1;
-                let bestDistance = Number.POSITIVE_INFINITY;
-                while (from <= text.length) {
-                  const at = lowerText.indexOf(activeEntityName, from);
-                  if (at < 0) {
-                    break;
-                  }
-                  const distance = Math.abs(at - fact.evidenceStart);
-                  if (distance < bestDistance) {
-                    bestStart = at;
-                    bestDistance = distance;
-                  }
-                  from = at + activeEntityName.length;
-                }
-                if (bestStart < 0) {
-                  return null;
-                }
-                return { start: bestStart, end: bestStart + activeEntityName.length };
-              })();
-
-              return nearest ? [nearest] : [];
-            }),
-          ...extractionV2.relations
-            .filter(
-              (relation) =>
-                relation.fromEntityId === activeEntityId || relation.toEntityId === activeEntityId,
-            )
-            .flatMap((relation) =>
-              relation.evidenceStart !== undefined && relation.evidenceEnd !== undefined
-                ? [{ start: relation.evidenceStart, end: relation.evidenceEnd }]
-                : [],
-            ),
-          ...extractionV2.entities
-            .filter((entity) => entity.id === activeEntityId)
-            .map((entity) => ({ start: entity.nameStart, end: entity.nameEnd })),
-        ];
-
+  entitySpans: SourceEntitySpan[],
+  colorByEntityId: Map<string, string>,
+  overlaySpans: SourceOverlaySpan[],
+): SourceChunk[] => {
   const boundaries = new Set<number>([0, text.length]);
   for (const span of entitySpans) {
     boundaries.add(span.start);
     boundaries.add(span.end);
   }
-  for (const span of involvementSpans) {
+  for (const span of overlaySpans) {
     if (span.start >= 0 && span.end > span.start && span.end <= text.length) {
       boundaries.add(span.start);
       boundaries.add(span.end);
@@ -239,8 +189,7 @@ const buildSourceChunks = (
   }
 
   const sorted = Array.from(boundaries).sort((a, b) => a - b);
-  const chunks: Array<{ key: string; text: string; entityId: string | null; involved: boolean }> =
-    [];
+  const chunks: SourceChunk[] = [];
 
   for (let index = 0; index < sorted.length - 1; index += 1) {
     const start = sorted[index];
@@ -255,13 +204,15 @@ const buildSourceChunks = (
     }
 
     const ownerEntity = entitySpans.find((span) => span.start < end && span.end > start);
-    const involved = involvementSpans.some((span) => span.start < end && span.end > start);
+    const overlay = overlaySpans.find((span) => span.start < end && span.end > start);
 
     chunks.push({
-      key: `chunk-${start}-${end}-${ownerEntity?.id ?? 'plain'}-${involved ? 'active' : 'idle'}`,
+      key: `chunk-${start}-${end}-${ownerEntity?.id ?? 'plain'}-${overlay?.id ?? 'idle'}`,
       text: textChunk,
       entityId: ownerEntity?.id ?? null,
-      involved,
+      entityColor: ownerEntity ? (colorByEntityId.get(ownerEntity.id) ?? '#fff3bf') : null,
+      overlayColor: overlay?.color ?? null,
+      involved: overlay !== undefined,
     });
   }
 
@@ -412,11 +363,13 @@ const KnowledgeExtractionView = ({
   debug: ExtractionDebug;
 }) => {
   const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
+  const [activeFactId, setActiveFactId] = useState<string | null>(null);
+  const [activeRelationKey, setActiveRelationKey] = useState<string | null>(null);
 
   const entityOrder = useMemo(() => {
     return extractionV2.entities.map((entity, index) => ({
       id: entity.id,
-      color: getEntityColor(index),
+      color: getGlobalColor(index),
     }));
   }, [extractionV2.entities]);
 
@@ -424,13 +377,141 @@ const KnowledgeExtractionView = ({
     return new Map(entityOrder.map((entry) => [entry.id, entry.color]));
   }, [entityOrder]);
 
+  const factOrder = useMemo(() => {
+    return extractionV2.facts.map((fact, index) => ({
+      id: fact.id,
+      color: getGlobalColor(extractionV2.entities.length + index),
+    }));
+  }, [extractionV2.entities.length, extractionV2.facts]);
+
+  const colorByFactId = useMemo(() => {
+    return new Map(factOrder.map((entry) => [entry.id, entry.color]));
+  }, [factOrder]);
+
+  const relationOrder = useMemo(() => {
+    return extractionV2.relations.map((relation, index) => ({
+      key: getRelationKey(relation, index),
+      color: getGlobalColor(extractionV2.entities.length + extractionV2.facts.length + index),
+    }));
+  }, [extractionV2.entities.length, extractionV2.facts.length, extractionV2.relations]);
+
+  const colorByRelationKey = useMemo(() => {
+    return new Map(relationOrder.map((entry) => [entry.key, entry.color]));
+  }, [relationOrder]);
+
   const entityById = useMemo(() => {
     return new Map(extractionV2.entities.map((entity) => [entity.id, entity]));
   }, [extractionV2.entities]);
 
+  const entitySpans = useMemo(() => {
+    return extractionV2.entities
+      .map((entity) => ({ id: entity.id, start: entity.nameStart, end: entity.nameEnd }))
+      .filter((span) => span.start >= 0 && span.end > span.start && span.end <= sourceText.length);
+  }, [extractionV2.entities, sourceText.length]);
+
+  const activeOverlaySpans = useMemo(() => {
+    const spans: SourceOverlaySpan[] = [];
+
+    if (activeEntityId !== null) {
+      const entity = extractionV2.entities.find((item) => item.id === activeEntityId);
+      if (entity) {
+        spans.push({
+          id: `entity-${entity.id}`,
+          start: entity.nameStart,
+          end: entity.nameEnd,
+          color: colorByEntityId.get(entity.id) ?? '#fff3bf',
+        });
+      }
+
+      for (const fact of extractionV2.facts) {
+        const isRelated =
+          fact.ownerEntityId === activeEntityId ||
+          fact.subjectEntityId === activeEntityId ||
+          fact.objectEntityId === activeEntityId;
+        if (!isRelated) {
+          continue;
+        }
+        spans.push({
+          id: `fact-${fact.id}`,
+          start: fact.evidenceStart,
+          end: fact.evidenceEnd,
+          color: colorByFactId.get(fact.id) ?? '#ffe8cc',
+        });
+      }
+
+      extractionV2.relations.forEach((relation, relationIndex) => {
+        const isRelated =
+          relation.fromEntityId === activeEntityId || relation.toEntityId === activeEntityId;
+        if (!isRelated) {
+          return;
+        }
+        if (relation.evidenceStart === undefined || relation.evidenceEnd === undefined) {
+          return;
+        }
+        const key = getRelationKey(relation, relationIndex);
+        spans.push({
+          id: `relation-${key}`,
+          start: relation.evidenceStart,
+          end: relation.evidenceEnd,
+          color: colorByRelationKey.get(key) ?? '#ffe8cc',
+        });
+      });
+    }
+
+    if (activeFactId !== null) {
+      const fact = extractionV2.facts.find((item) => item.id === activeFactId);
+      if (fact) {
+        spans.push({
+          id: `fact-${fact.id}`,
+          start: fact.evidenceStart,
+          end: fact.evidenceEnd,
+          color: colorByFactId.get(fact.id) ?? '#ffe8cc',
+        });
+      }
+    }
+
+    if (activeRelationKey !== null) {
+      const relationIndex = relationOrder.findIndex(
+        (relation) => relation.key === activeRelationKey,
+      );
+      if (relationIndex >= 0) {
+        const relation = extractionV2.relations[relationIndex];
+        if (
+          relation &&
+          relation.evidenceStart !== undefined &&
+          relation.evidenceEnd !== undefined
+        ) {
+          spans.push({
+            id: `relation-${activeRelationKey}`,
+            start: relation.evidenceStart,
+            end: relation.evidenceEnd,
+            color: colorByRelationKey.get(activeRelationKey) ?? '#ffe8cc',
+          });
+        }
+      }
+    }
+
+    return spans.filter(
+      (span) =>
+        span.start >= 0 && span.end > span.start && span.end <= sourceText.length && span.color,
+    );
+  }, [
+    activeEntityId,
+    activeFactId,
+    activeRelationKey,
+    extractionV2.entities,
+    extractionV2.facts,
+    extractionV2.relations,
+    relationOrder,
+    colorByEntityId,
+    colorByFactId,
+    colorByRelationKey,
+    sourceText.length,
+  ]);
+
   const highlightedChunks = useMemo(() => {
-    return buildSourceChunks(sourceText, extractionV2, activeEntityId);
-  }, [sourceText, extractionV2, activeEntityId]);
+    return buildSourceChunks(sourceText, entitySpans, colorByEntityId, activeOverlaySpans);
+  }, [sourceText, entitySpans, colorByEntityId, activeOverlaySpans]);
   const summaryChunks = useMemo(
     () => buildSummaryChunks(extractionV2.summary, extractionV2.entities),
     [extractionV2.summary, extractionV2.entities],
@@ -480,8 +561,16 @@ const KnowledgeExtractionView = ({
               <span
                 key={chunk.key}
                 data-testid={`summary-entity-${chunk.entityId}`}
-                onMouseEnter={() => setActiveEntityId(chunk.entityId)}
-                onMouseLeave={() => setActiveEntityId(null)}
+                onMouseEnter={() => {
+                  setActiveEntityId(chunk.entityId);
+                  setActiveFactId(null);
+                  setActiveRelationKey(null);
+                }}
+                onMouseLeave={() => {
+                  setActiveEntityId(null);
+                  setActiveFactId(null);
+                  setActiveRelationKey(null);
+                }}
                 style={{
                   background: color,
                   borderRadius: 4,
@@ -531,15 +620,12 @@ const KnowledgeExtractionView = ({
                 <span
                   key={chunk.key}
                   data-involved={chunk.involved ? 'true' : 'false'}
-                  style={
-                    chunk.involved
-                      ? {
-                          background: '#ffe8cc',
-                          borderRadius: 4,
-                          padding: '1px 1px',
-                        }
-                      : undefined
-                  }
+                  style={{
+                    background: chunk.overlayColor ?? undefined,
+                    borderRadius: chunk.overlayColor ? 4 : undefined,
+                    padding: chunk.overlayColor ? '1px 1px' : undefined,
+                    boxShadow: chunk.overlayColor ? 'inset 0 -2px 0 rgba(0,0,0,0.08)' : undefined,
+                  }}
                 >
                   {chunk.text}
                 </span>
@@ -553,13 +639,21 @@ const KnowledgeExtractionView = ({
                 key={chunk.key}
                 data-involved={chunk.involved ? 'true' : 'false'}
                 data-testid={`source-entity-${chunk.entityId}`}
-                onMouseEnter={() => setActiveEntityId(chunk.entityId)}
-                onMouseLeave={() => setActiveEntityId(null)}
+                onMouseEnter={() => {
+                  setActiveEntityId(chunk.entityId);
+                  setActiveFactId(null);
+                  setActiveRelationKey(null);
+                }}
+                onMouseLeave={() => {
+                  setActiveEntityId(null);
+                  setActiveFactId(null);
+                  setActiveRelationKey(null);
+                }}
                 style={{
-                  background: chunk.involved ? '#ffe8cc' : baseColor,
+                  background: chunk.overlayColor ?? chunk.entityColor ?? baseColor,
                   borderRadius: 4,
                   padding: '1px 2px',
-                  boxShadow: chunk.involved ? 'inset 0 -2px 0 #f08c00' : undefined,
+                  boxShadow: chunk.involved ? 'inset 0 -2px 0 rgba(0,0,0,0.18)' : undefined,
                   opacity:
                     activeEntityId && chunk.entityId !== activeEntityId && !chunk.involved
                       ? 0.65
@@ -585,8 +679,16 @@ const KnowledgeExtractionView = ({
               <li
                 key={entity.id}
                 data-testid={`entity-row-${entity.id}`}
-                onMouseEnter={() => setActiveEntityId(entity.id)}
-                onMouseLeave={() => setActiveEntityId(null)}
+                onMouseEnter={() => {
+                  setActiveEntityId(entity.id);
+                  setActiveFactId(null);
+                  setActiveRelationKey(null);
+                }}
+                onMouseLeave={() => {
+                  setActiveEntityId(null);
+                  setActiveFactId(null);
+                  setActiveRelationKey(null);
+                }}
                 style={{
                   outline: isActive ? '2px solid #f08c00' : 'none',
                   borderRadius: 6,
@@ -602,7 +704,7 @@ const KnowledgeExtractionView = ({
                     height: 10,
                     borderRadius: '50%',
                     marginRight: 6,
-                    background: getEntityColor(index),
+                    background: colorByEntityId.get(entity.id) ?? getGlobalColor(index),
                   }}
                 />
                 <strong>{entity.name}</strong> ({entity.type}) [{entity.nameStart}-{entity.nameEnd}]
@@ -627,28 +729,47 @@ const KnowledgeExtractionView = ({
             const object = fact.objectEntityId
               ? (entityById.get(fact.objectEntityId)?.name ?? fact.objectEntityId)
               : (fact.objectText ?? '-');
+            const factColor = colorByFactId.get(fact.id) ?? '#ffe8cc';
             const involved =
-              activeEntityId !== null &&
-              (fact.ownerEntityId === activeEntityId ||
-                fact.subjectEntityId === activeEntityId ||
-                fact.objectEntityId === activeEntityId);
+              (activeEntityId !== null &&
+                (fact.ownerEntityId === activeEntityId ||
+                  fact.subjectEntityId === activeEntityId ||
+                  fact.objectEntityId === activeEntityId)) ||
+              activeFactId === fact.id;
 
             return (
               <li
                 key={fact.id}
                 data-testid={`fact-row-${fact.id}`}
                 data-involved={involved ? 'true' : 'false'}
-                onMouseEnter={() =>
-                  setActiveEntityId(fact.subjectEntityId ?? fact.ownerEntityId ?? null)
-                }
-                onMouseLeave={() => setActiveEntityId(null)}
+                onMouseEnter={() => {
+                  setActiveEntityId(fact.subjectEntityId ?? fact.ownerEntityId ?? null);
+                  setActiveFactId(fact.id);
+                  setActiveRelationKey(null);
+                }}
+                onMouseLeave={() => {
+                  setActiveEntityId(null);
+                  setActiveFactId(null);
+                  setActiveRelationKey(null);
+                }}
                 style={{
-                  background: involved ? '#fff4e6' : undefined,
-                  borderLeft: involved ? '3px solid #f08c00' : undefined,
+                  background: involved ? `${factColor}66` : undefined,
+                  borderLeft: involved ? `3px solid ${factColor}` : undefined,
                   paddingLeft: involved ? 6 : undefined,
                   cursor: 'pointer',
                 }}
               >
+                <span
+                  aria-hidden
+                  style={{
+                    display: 'inline-block',
+                    width: 10,
+                    height: 10,
+                    borderRadius: '50%',
+                    marginRight: 6,
+                    background: factColor,
+                  }}
+                />
                 owner=<strong>{owner}</strong> perspective=<strong>{fact.perspective}</strong> |{' '}
                 {subject} → <strong>{formatPredicate(fact.predicate)}</strong> → {object} [
                 {fact.evidenceStart}-{fact.evidenceEnd}]
@@ -661,29 +782,45 @@ const KnowledgeExtractionView = ({
       <div>
         <h3 style={{ marginBottom: 6 }}>Relations</h3>
         <ul data-testid="extraction-v2-relations" style={{ margin: 0, paddingLeft: 18 }}>
-          {extractionV2.relations.map((relation, index) => (
-            <li
-              key={`${relation.fromEntityId}-${relation.toEntityId}-${relation.type}-${index}`}
-              onMouseEnter={() => setActiveEntityId(relation.fromEntityId)}
-              onMouseLeave={() => setActiveEntityId(null)}
-              style={{ cursor: 'pointer' }}
-            >
-              {relation.fromEntityId} → {relation.toEntityId} ({relation.type})
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div>
-        <h3 style={{ marginBottom: 6 }}>Segments</h3>
-        <ul data-testid="extraction-v2-segments" style={{ margin: 0, paddingLeft: 18 }}>
-          {extractionV2.segments.map((segment) => (
-            <li key={segment.id}>
-              <strong>{segment.id}</strong> [{segment.start}-{segment.end}] sentiment=
-              {segment.sentiment} -{' '}
-              {segment.summary || getExcerpt(sourceText, segment.start, segment.end)}
-            </li>
-          ))}
+          {extractionV2.relations.map((relation, index) => {
+            const key = getRelationKey(relation, index);
+            const relationColor = colorByRelationKey.get(key) ?? '#ffe8cc';
+            const isActive = activeRelationKey === key;
+            return (
+              <li
+                key={key}
+                onMouseEnter={() => {
+                  setActiveEntityId(relation.fromEntityId);
+                  setActiveFactId(null);
+                  setActiveRelationKey(key);
+                }}
+                onMouseLeave={() => {
+                  setActiveEntityId(null);
+                  setActiveFactId(null);
+                  setActiveRelationKey(null);
+                }}
+                style={{
+                  cursor: 'pointer',
+                  background: isActive ? `${relationColor}66` : undefined,
+                  borderLeft: isActive ? `3px solid ${relationColor}` : undefined,
+                  paddingLeft: isActive ? 6 : undefined,
+                }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    display: 'inline-block',
+                    width: 10,
+                    height: 10,
+                    borderRadius: '50%',
+                    marginRight: 6,
+                    background: relationColor,
+                  }}
+                />
+                {relation.fromEntityId} → {relation.toEntityId} ({relation.type})
+              </li>
+            );
+          })}
         </ul>
       </div>
 
