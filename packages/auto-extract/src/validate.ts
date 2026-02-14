@@ -24,6 +24,37 @@ const parseString = (value: unknown, label: string): string => {
   return value;
 };
 
+const findClosestMatchStart = (text: string, value: string, hintStart: number): number => {
+  const matches: number[] = [];
+  let fromIndex = 0;
+
+  while (fromIndex <= text.length) {
+    const index = text.indexOf(value, fromIndex);
+    if (index < 0) {
+      break;
+    }
+    matches.push(index);
+    fromIndex = index + 1;
+  }
+
+  if (matches.length === 0) {
+    return -1;
+  }
+
+  let best = matches[0] ?? -1;
+  let bestDistance = Math.abs(best - hintStart);
+
+  for (const candidate of matches) {
+    const distance = Math.abs(candidate - hintStart);
+    if (distance < bestDistance) {
+      best = candidate;
+      bestDistance = distance;
+    }
+  }
+
+  return best;
+};
+
 const mentionPatterns: RegExp[] = [
   /\b(?:gemma(?:\s+\d+(?:\.\d+)?b)?(?:\s+q\d+)?)\b/gi,
   /\bllama\.cpp\b/gi,
@@ -93,15 +124,15 @@ export const validateExtraction = (text: string, raw: unknown): Extraction => {
     throw new Error('items must be an array.');
   }
 
-  const items = itemsRaw.map((itemRaw, index) => {
+  const items = itemsRaw.flatMap((itemRaw, index) => {
     if (!isObject(itemRaw)) {
       throw new Error(`items[${index}] must be an object.`);
     }
 
     const label = parseString(itemRaw.label, `items[${index}].label`);
     const value = parseString(itemRaw.value, `items[${index}].value`);
-    const start = parseNumber(itemRaw.start, `items[${index}].start`);
-    const end = parseNumber(itemRaw.end, `items[${index}].end`);
+    let start = parseNumber(itemRaw.start, `items[${index}].start`);
+    let end = parseNumber(itemRaw.end, `items[${index}].end`);
     const confidence = parseNumber(itemRaw.confidence, `items[${index}].confidence`);
 
     if (!Number.isInteger(start) || !Number.isInteger(end)) {
@@ -118,18 +149,23 @@ export const validateExtraction = (text: string, raw: unknown): Extraction => {
 
     const grounded = text.slice(start, end);
     if (value !== grounded) {
-      throw new Error(
-        `items[${index}] failed grounding check: value must equal text.slice(start,end).`,
-      );
+      const repairedStart = findClosestMatchStart(text, value, start);
+      if (repairedStart < 0) {
+        return [];
+      }
+      start = repairedStart;
+      end = repairedStart + value.length;
     }
 
-    return {
-      label,
-      value,
-      start,
-      end,
-      confidence,
-    };
+    return [
+      {
+        label,
+        value,
+        start,
+        end,
+        confidence,
+      },
+    ];
   });
 
   const groupsRaw = raw.groups;
@@ -149,7 +185,7 @@ export const validateExtraction = (text: string, raw: unknown): Extraction => {
       throw new Error(`groups[${index}].itemIndexes must be an array.`);
     }
 
-    const itemIndexes = itemIndexesRaw.map((itemIndex, itemIndexPos) => {
+    const itemIndexes = itemIndexesRaw.flatMap((itemIndex, itemIndexPos) => {
       const parsedIndex = parseNumber(itemIndex, `groups[${index}].itemIndexes[${itemIndexPos}]`);
 
       if (!Number.isInteger(parsedIndex)) {
@@ -157,10 +193,10 @@ export const validateExtraction = (text: string, raw: unknown): Extraction => {
       }
 
       if (parsedIndex < 0 || parsedIndex >= items.length) {
-        throw new Error(`groups[${index}].itemIndexes[${itemIndexPos}] is out of range for items.`);
+        return [];
       }
 
-      return parsedIndex;
+      return [parsedIndex];
     });
 
     return {
@@ -185,11 +221,76 @@ export const parseAndValidateExtractionOutput = (text: string, rawOutput: string
   const trimmed = rawOutput.trim();
   let parsed: unknown;
 
+  const findFirstJsonObject = (input: string): string | null => {
+    const startIndex = input.indexOf('{');
+    if (startIndex < 0) {
+      return null;
+    }
+
+    let depth = 0;
+    let inString = false;
+    let escaping = false;
+
+    for (let index = startIndex; index < input.length; index += 1) {
+      const ch = input[index];
+
+      if (inString) {
+        if (escaping) {
+          escaping = false;
+          continue;
+        }
+
+        if (ch === '\\\\') {
+          escaping = true;
+          continue;
+        }
+
+        if (ch === '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (ch === '"') {
+        inString = true;
+        continue;
+      }
+
+      if (ch === '{') {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          return input.slice(startIndex, index + 1);
+        }
+      }
+    }
+
+    return null;
+  };
+
   try {
     parsed = JSON.parse(trimmed);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Model output is not valid JSON: ${message}`);
+    const candidate = findFirstJsonObject(trimmed);
+    if (candidate) {
+      try {
+        parsed = JSON.parse(candidate);
+      } catch {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `Model output is not valid JSON: ${message}. Raw output: ${trimmed.slice(0, 1200)}`,
+        );
+      }
+    } else {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Model output is not valid JSON: ${message}. Raw output: ${trimmed.slice(0, 1200)}`,
+      );
+    }
   }
 
   return validateExtraction(text, parsed);

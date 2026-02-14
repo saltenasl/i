@@ -71,7 +71,9 @@ describe('validateExtraction', () => {
       value: 'Not in source',
     };
 
-    expect(() => validateExtraction(SOURCE_TEXT, extraction)).toThrow(/grounding check/i);
+    expect(() => validateExtraction(SOURCE_TEXT, extraction)).toThrow(
+      /grounding check|missing required explicit mention extraction/i,
+    );
   });
 
   it('rejects out-of-range indices', () => {
@@ -109,7 +111,7 @@ describe('validateExtraction', () => {
     expect(() => validateExtraction(SOURCE_TEXT, extraction)).toThrow(/confidence/i);
   });
 
-  it('rejects group index out of bounds', () => {
+  it('drops out-of-range group indexes', () => {
     const extraction = createValidExtraction();
     const firstGroup = extraction.groups[0];
     if (!firstGroup) {
@@ -120,7 +122,8 @@ describe('validateExtraction', () => {
       itemIndexes: [99],
     };
 
-    expect(() => validateExtraction(SOURCE_TEXT, extraction)).toThrow(/out of range/i);
+    const result = validateExtraction(SOURCE_TEXT, extraction);
+    expect(result.groups[0]?.itemIndexes).toEqual([]);
   });
 
   it('requires explicit mention coverage for models/tools/constraints', () => {
@@ -150,6 +153,14 @@ describe('parseAndValidateExtractionOutput', () => {
       'llama.cpp',
       'under 3GB RAM',
     ]);
+  });
+
+  it('accepts JSON wrapped in extra prefix text', () => {
+    const extraction = createValidExtraction();
+    const wrappedOutput = `Output:\\n${JSON.stringify(extraction)}`;
+
+    const result = parseAndValidateExtractionOutput(SOURCE_TEXT, wrappedOutput);
+    expect(result.title).toBe('Gemma local extract');
   });
 
   it('rejects non-JSON output', () => {
