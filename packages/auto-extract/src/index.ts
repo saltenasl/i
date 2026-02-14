@@ -45,6 +45,7 @@ type ExtractionBundle = {
 };
 
 const NARRATOR_ENTITY_ID = 'ent_self';
+const NOTETAKER_TERM = 'notetaker';
 
 let assetsPromise: ReturnType<typeof ensureAssets> | undefined;
 let runtimePromise: Promise<LlamaServerRuntime> | undefined;
@@ -434,7 +435,42 @@ const isNarratorEntity = (entity: ExtractionV2['entities'][number]): boolean => 
     return true;
   }
 
-  return entity.context?.toLowerCase().includes('narrator') ?? false;
+  const normalizedContext = entity.context?.toLowerCase() ?? '';
+  return normalizedContext.includes('narrator') || normalizedContext.includes(NOTETAKER_TERM);
+};
+
+const normalizeSelfContext = (context: string | undefined): string => {
+  const normalized = (context ?? '').replace(/\bnarrator\b/gi, NOTETAKER_TERM).trim();
+  if (!normalized) {
+    return NOTETAKER_TERM;
+  }
+  if (/\bnotetaker\b/i.test(normalized)) {
+    return normalized;
+  }
+  return `${normalized}; ${NOTETAKER_TERM}`;
+};
+
+const replaceNarratorWord = (value: string): string => {
+  return value.replace(/\bnarrator\b/gi, NOTETAKER_TERM);
+};
+
+const ensureNotetakerTerminology = (extraction: ExtractionV2): ExtractionV2 => {
+  return {
+    ...extraction,
+    summary: replaceNarratorWord(extraction.summary),
+    entities: extraction.entities.map((entity) => ({
+      ...entity,
+      ...(entity.id === NARRATOR_ENTITY_ID && /^narrator$/i.test(entity.name)
+        ? { name: 'I' }
+        : { name: replaceNarratorWord(entity.name) }),
+      ...(entity.context ? { context: replaceNarratorWord(entity.context) } : {}),
+    })),
+    facts: extraction.facts.map((fact) => ({
+      ...fact,
+      predicate: replaceNarratorWord(fact.predicate),
+      ...(fact.objectText ? { objectText: replaceNarratorWord(fact.objectText) } : {}),
+    })),
+  };
 };
 
 const nextFactId = (facts: ExtractionV2['facts']): string => {
@@ -512,7 +548,7 @@ const ensureSelfOwnership = (extraction: ExtractionV2, text: string): Extraction
       type: 'person',
       nameStart: narratorSpan.start,
       nameEnd: narratorSpan.end,
-      context: 'narrator',
+      context: NOTETAKER_TERM,
       confidence: 0.75,
     };
   }
@@ -538,11 +574,7 @@ const ensureSelfOwnership = (extraction: ExtractionV2, text: string): Extraction
             nameEnd: normalizedSelfSpan.end,
           }
         : {}),
-      context: selfEntity.context?.toLowerCase().includes('narrator')
-        ? selfEntity.context
-        : selfEntity.context
-          ? `${selfEntity.context}; narrator`
-          : 'narrator',
+      context: normalizeSelfContext(selfEntity.context),
     });
   }
 
@@ -704,7 +736,8 @@ const removeConflictingCollectiveDrivingFacts = (
 export const postProcessExtractionV2 = (extraction: ExtractionV2, text: string): ExtractionV2 => {
   const owned = ensureSelfOwnership(extraction, text);
   const withTodos = enrichTodoFacts(owned, text);
-  return removeConflictingCollectiveDrivingFacts(withTodos, text);
+  const conflictCleaned = removeConflictingCollectiveDrivingFacts(withTodos, text);
+  return ensureNotetakerTerminology(conflictCleaned);
 };
 
 const enrichTodoFacts = (extraction: ExtractionV2, text: string): ExtractionV2 => {

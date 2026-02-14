@@ -85,9 +85,10 @@
 - Testing exception convention: for RTL/backend tests, `auto-extract` behavior may be mocked when needed for deterministic test coverage, with explicit user-approved intent documented in the test.
 - Auto-extract test convention: tests must not call real `@repo/auto-extract` inference by default; any temporary unmocking requires explicit per-task user permission and an in-file override marker documented with rationale, due cost and runtime volatility.
 - Extraction pipeline convention: run one whole-note LLM extraction pass first (global-context), then deterministically derive segments from grounded spans; do not pre-split into multiple LLM calls by default.
-- Attribution convention: every fact must carry `ownerEntityId` and `perspective` (`self`/`other`/`uncertain`) to avoid conflating narrator facts with other entities.
-- Narrator-first convention: in first-person notes, narrator (`I`) is the default owner for first-person evidence; explicit third-party evidence remains `other`.
-- Pronoun convention: `we` implies narrator involvement and should map to narrator ownership/perspective unless explicitly excluded.
+- Attribution convention: every fact must carry `ownerEntityId` and `perspective` (`self`/`other`/`uncertain`) to avoid conflating notetaker facts with other entities.
+- Notetaker-first convention: in first-person notes, the notetaker (`I`) is the default owner for first-person evidence; explicit third-party evidence remains `other`.
+- Pronoun convention: `we` implies notetaker involvement and should map to notetaker ownership/perspective unless explicitly excluded.
+- Terminology convention: extraction outputs/prompts should use "notetaker" terminology (or direct first-person `I`) and must not label the author as "narrator".
 - Sentiment convention: use per-segment sentiment as primary query surface; top-level sentiment is a rollup and uses `varied` when segments differ.
 - Fact language convention: predicates should be concise natural language (spaces), not snake_case, for cross-model consistency and UI readability.
 - UI convention: extraction page must show original source text with color-matched entity highlights and excerpt snippets in the entity list.

@@ -148,7 +148,7 @@ describe('validateExtractionV2', () => {
     expect(scared?.perspective).toBe('other');
   });
 
-  it('supports narrator self-owned facts', () => {
+  it('supports notetaker self-owned facts', () => {
     const extraction = validateExtractionV2(V2_TEXT, createValidExtractionV2());
     const call = extraction.facts.find((fact) => fact.id === 'fact-call');
     expect(call?.ownerEntityId).toBe('ent-self');
@@ -182,7 +182,7 @@ describe('validateExtractionV2', () => {
 });
 
 describe('postProcessExtractionV2', () => {
-  it('prefers singular narrator anchor and resolves unresolved self ownership', () => {
+  it('prefers singular notetaker anchor and resolves unresolved self ownership', () => {
     const text = 'we were driving and there was ice. I called support. Egle was driving.';
     const weStart = text.indexOf('we');
     const iStart = text.indexOf('I called');
@@ -199,7 +199,7 @@ describe('postProcessExtractionV2', () => {
       callStart < 0 ||
       egleDrivingStart < 0
     ) {
-      throw new Error('Expected narrator/driver fixtures to exist in source text.');
+      throw new Error('Expected notetaker/driver fixtures to exist in source text.');
     }
 
     const raw: ExtractionV2 = {
@@ -217,7 +217,7 @@ describe('postProcessExtractionV2', () => {
           type: 'person',
           nameStart: weStart,
           nameEnd: weStart + 2,
-          context: 'narrator',
+          context: 'notetaker',
           confidence: 0.8,
         },
         {
@@ -270,12 +270,66 @@ describe('postProcessExtractionV2', () => {
     };
 
     const result = postProcessExtractionV2(raw, text);
-    const narrator = result.entities.find((entity) => entity.id === 'ent_self');
+    const notetaker = result.entities.find((entity) => entity.id === 'ent_self');
     const callFact = result.facts.find((fact) => fact.id === 'fact-call');
     const selfDrivingFact = result.facts.find((fact) => fact.id === 'fact-self-driving');
 
-    expect(narrator?.name).toBe('I');
+    expect(notetaker?.name).toBe('I');
+    expect(notetaker?.context).toContain('notetaker');
     expect(callFact?.ownerEntityId).toBe('ent_self');
     expect(selfDrivingFact).toBeUndefined();
+  });
+
+  it('replaces narrator wording with notetaker wording', () => {
+    const text = 'I wrote this note.';
+    const iStart = text.indexOf('I');
+    if (iStart < 0) {
+      throw new Error('Expected notetaker fixture to exist in source text.');
+    }
+
+    const raw: ExtractionV2 = {
+      title: 'Note',
+      noteType: 'personal',
+      summary: 'Narrator noted this.',
+      language: 'en',
+      date: null,
+      sentiment: 'neutral',
+      emotions: [],
+      entities: [
+        {
+          id: 'ent_self',
+          name: 'narrator',
+          type: 'person',
+          nameStart: iStart,
+          nameEnd: iStart + 1,
+          context: 'Narrator',
+          confidence: 0.9,
+        },
+      ],
+      facts: [
+        {
+          id: 'fact_1',
+          ownerEntityId: 'ent_self',
+          perspective: 'self',
+          predicate: 'narrator wrote',
+          evidenceStart: iStart,
+          evidenceEnd: iStart + 1,
+          confidence: 0.8,
+        },
+      ],
+      relations: [],
+      groups: [{ name: 'people', entityIds: ['ent_self'], factIds: ['fact_1'] }],
+      segments: [],
+    };
+
+    const result = postProcessExtractionV2(raw, text);
+    const notetaker = result.entities.find((entity) => entity.id === 'ent_self');
+    const fact = result.facts[0];
+
+    expect(result.summary.toLowerCase()).not.toContain('narrator');
+    expect(result.summary.toLowerCase()).toContain('notetaker');
+    expect(notetaker?.name).toBe('I');
+    expect(notetaker?.context?.toLowerCase()).toContain('notetaker');
+    expect(fact?.predicate.toLowerCase()).toContain('notetaker');
   });
 });
