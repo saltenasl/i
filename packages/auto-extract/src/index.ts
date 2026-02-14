@@ -3,7 +3,7 @@ import net from 'node:net';
 import os from 'node:os';
 import { anthropic } from '@ai-sdk/anthropic';
 import { openai } from '@ai-sdk/openai';
-import { generateText } from 'ai';
+import { generateObject, generateText } from 'ai';
 import { ensureAssets } from './assets.js';
 import { buildPromptV2, buildSystemPromptV2, buildUserPromptV2 } from './prompt.js';
 import type {
@@ -13,10 +13,10 @@ import type {
   FactPerspective,
   NoteSentiment,
 } from './types.js';
-import { parseAndValidateExtractionV2Output } from './validate.js';
+import { parseAndValidateExtractionV2Output, validateExtractionV2 } from './validate.js';
 
 const FAST_OUTPUT_TOKENS = 400;
-const CLOUD_OUTPUT_TOKENS = 2_000;
+const CLOUD_OUTPUT_TOKENS = 1_200;
 const SERVER_READY_TIMEOUT_MS = 45_000;
 const SERVER_REQUEST_TIMEOUT_MS = 20_000;
 const CLOUD_REQUEST_TIMEOUT_MS = 30_000;
@@ -268,6 +268,50 @@ const readCompletionText = (responseBody: unknown): string => {
   throw new Error('Unable to find completion text in llama-server response.');
 };
 
+const readChatCompletionText = (responseBody: unknown): string => {
+  if (typeof responseBody !== 'object' || responseBody === null) {
+    throw new Error('Unexpected llama-server chat response shape.');
+  }
+
+  const body = responseBody as Record<string, unknown>;
+  const choices = body.choices;
+  if (!Array.isArray(choices) || choices.length === 0) {
+    throw new Error('llama-server chat response has no choices.');
+  }
+
+  const firstChoice = choices[0];
+  if (!firstChoice || typeof firstChoice !== 'object') {
+    throw new Error('llama-server chat first choice is invalid.');
+  }
+
+  const message = (firstChoice as Record<string, unknown>).message;
+  if (!message || typeof message !== 'object') {
+    throw new Error('llama-server chat choice has no message.');
+  }
+
+  const content = (message as Record<string, unknown>).content;
+  if (typeof content === 'string') {
+    return content;
+  }
+
+  if (Array.isArray(content)) {
+    const joined = content
+      .flatMap((part) => {
+        if (!part || typeof part !== 'object') {
+          return [];
+        }
+        const text = (part as Record<string, unknown>).text;
+        return typeof text === 'string' ? [text] : [];
+      })
+      .join('');
+    if (joined) {
+      return joined;
+    }
+  }
+
+  throw new Error('Unable to find content in llama-server chat response.');
+};
+
 const runLlamaCompletion = async (prompt: string, nPredict: number): Promise<string> => {
   ensureExitHandlers();
   const runtime = await getRuntime();
@@ -278,7 +322,31 @@ const runLlamaCompletion = async (prompt: string, nPredict: number): Promise<str
   }, SERVER_REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${runtime.baseUrl}/completion`, {
+    // Prefer OpenAI-compatible chat completions to improve instruction following on local GGUF models.
+    try {
+      const chatResponse = await fetch(`${runtime.baseUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'local',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: nPredict,
+          response_format: { type: 'json_object' },
+        }),
+        signal: controller.signal,
+      });
+
+      if (chatResponse.ok) {
+        const chatJson = (await chatResponse.json()) as unknown;
+        return readChatCompletionText(chatJson);
+      }
+    } catch {
+      // Fall back to /completion if chat endpoint is unavailable.
+    }
+
+    const completionResponse = await fetch(`${runtime.baseUrl}/completion`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -287,45 +355,26 @@ const runLlamaCompletion = async (prompt: string, nPredict: number): Promise<str
         prompt,
         n_predict: nPredict,
         temperature: 0,
+        repeat_penalty: 1.1,
         stream: false,
       }),
       signal: controller.signal,
     });
 
-    if (!response.ok) {
-      const bodyText = await response.text();
+    if (!completionResponse.ok) {
+      const bodyText = await completionResponse.text();
       throw new Error(
-        `llama-server completion failed (${response.status}): ${bodyText.slice(0, 600)}`,
+        `llama-server completion failed (${completionResponse.status}): ${bodyText.slice(0, 600)}`,
       );
     }
 
-    const json = (await response.json()) as unknown;
-    return readCompletionText(json);
+    const completionJson = (await completionResponse.json()) as unknown;
+    return readCompletionText(completionJson);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to run extraction completion: ${message}`);
   } finally {
     clearTimeout(timeout);
-  }
-};
-
-const withTimeout = async <T>(
-  operation: Promise<T>,
-  timeoutMs: number,
-  message: string,
-): Promise<T> => {
-  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutHandle = setTimeout(() => reject(new Error(message)), timeoutMs);
-  });
-
-  try {
-    return await Promise.race([operation, timeoutPromise]);
-  } finally {
-    if (timeoutHandle) {
-      clearTimeout(timeoutHandle);
-    }
   }
 };
 
@@ -764,20 +813,19 @@ const runCloudExtractionBundle = async (
         ? anthropic(ANTHROPIC_HAIKU_MODEL)
         : openai(OPENAI_GPT5_MINI_MODEL);
 
-    const completion = await withTimeout(
-      generateText({
-        model,
-        system,
-        prompt,
-        temperature: 0,
-        maxOutputTokens: CLOUD_OUTPUT_TOKENS,
-      }),
-      CLOUD_REQUEST_TIMEOUT_MS,
-      `Timed out waiting for ${laneId} extraction response.`,
-    );
+    const completion = await generateObject({
+      model,
+      system,
+      prompt,
+      maxOutputTokens: CLOUD_OUTPUT_TOKENS,
+      timeout: CLOUD_REQUEST_TIMEOUT_MS,
+      output: 'no-schema',
+    });
 
-    rawModelOutput = completion.text;
-    const parsed = parseAndValidateExtractionV2Output(text, rawModelOutput);
+    const structuredOutput = completion.object;
+    rawModelOutput = JSON.stringify(structuredOutput);
+
+    const parsed = validateExtractionV2(text, structuredOutput);
     validated = postProcessExtractionV2(parsed, text);
 
     if (validated.entities.length === 0 && validated.facts.length === 0) {
