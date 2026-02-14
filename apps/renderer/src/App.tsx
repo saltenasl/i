@@ -970,6 +970,7 @@ const ExtractPage = () => {
 
     await Promise.allSettled(compareLaneOrder.map((laneId) => runLane(laneId)));
     setIsComparing(false);
+    await loadHistory();
   };
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {

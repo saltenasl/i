@@ -90,6 +90,15 @@ export const createBackendHandlers = (deps: BackendDependencies): ApiHandlers =>
 
     try {
       const lane = await (deps.runExtractionCompareLane ?? extractCompareLane)(text, input.laneId);
+      if (lane.status === 'ok' && lane.extraction && lane.extractionV2 && lane.debug) {
+        await persistExtractionHistoryService(deps.db, {
+          sourceText: text,
+          prompt: lane.debug.prompt,
+          extraction: lane.extraction,
+          extractionV2: lane.extractionV2,
+          debug: lane.debug,
+        });
+      }
       return ok({ lane });
     } catch (error) {
       return err('INTERNAL_ERROR', 'Failed to compare extraction lane.', {
@@ -105,6 +114,17 @@ export const createBackendHandlers = (deps: BackendDependencies): ApiHandlers =>
 
     try {
       const lanes = await (deps.runExtractionCompare ?? extractCompare)(text);
+      for (const lane of lanes.lanes) {
+        if (lane.status === 'ok' && lane.extraction && lane.extractionV2 && lane.debug) {
+          await persistExtractionHistoryService(deps.db, {
+            sourceText: text,
+            prompt: lane.debug.prompt,
+            extraction: lane.extraction,
+            extractionV2: lane.extractionV2,
+            debug: lane.debug,
+          });
+        }
+      }
       return ok(lanes);
     } catch (error) {
       return err('INTERNAL_ERROR', 'Failed to compare extraction.', {

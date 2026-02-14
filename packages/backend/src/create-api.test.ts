@@ -405,6 +405,14 @@ describe('createBackendHandlers', () => {
 
     expect(result.data.lane.laneId).toBe('openai-gpt5mini');
     expect(result.data.lane.status).toBe('ok');
+
+    const history = await handlers['extract.history.list']({ limit: 10 });
+    expect(history.ok).toBe(true);
+    if (!history.ok) {
+      return;
+    }
+    expect(history.data.entries).toHaveLength(1);
+    expect(history.data.entries[0]?.sourceText).toBe('Compare this text');
   });
 
   it('runs compare through injected compare dependency', async () => {
@@ -452,5 +460,12 @@ describe('createBackendHandlers', () => {
     expect(result.data.lanes).toHaveLength(3);
     expect(result.data.lanes[1]?.status).toBe('skipped');
     expect(result.data.lanes[2]?.status).toBe('error');
+
+    const history = await handlers['extract.history.list']({ limit: 10 });
+    expect(history.ok).toBe(true);
+    if (!history.ok) {
+      return;
+    }
+    expect(history.data.entries).toHaveLength(0);
   });
 });
