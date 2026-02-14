@@ -1177,6 +1177,9 @@ const ExtractPage = () => {
 
       <section data-testid="extraction-history" style={{ marginTop: 20, display: 'grid', gap: 10 }}>
         <h2 style={{ margin: 0, fontSize: 18 }}>Extraction History</h2>
+        <p style={{ margin: 0, fontSize: 13, opacity: 0.8 }}>
+          Select one or more entries to enable bulk debug-copy.
+        </p>
         {historyEntries.length === 0 ? (
           <p data-testid="extraction-history-empty" style={{ margin: 0, opacity: 0.75 }}>
             No extraction history yet.
@@ -1196,7 +1199,7 @@ const ExtractPage = () => {
                     position: 'relative',
                     border: selected ? '1px solid #f08c00' : '1px solid #d0d7de',
                     borderRadius: 10,
-                    padding: '10px 14px',
+                    padding: '10px 54px 10px 14px',
                     background: selected ? '#fff9db' : '#fff',
                   }}
                 >
@@ -1205,7 +1208,7 @@ const ExtractPage = () => {
                     style={{
                       position: 'absolute',
                       top: 10,
-                      right: -14,
+                      right: 10,
                       width: 28,
                       height: 28,
                       borderRadius: '50%',
