@@ -6,13 +6,7 @@ import { openai } from '@ai-sdk/openai';
 import { generateObject, generateText } from 'ai';
 import { ensureAssets } from './assets.js';
 import { buildPromptV2, buildSystemPromptV2, buildUserPromptV2 } from './prompt.js';
-import type {
-  Extraction,
-  ExtractionDebug,
-  ExtractionV2,
-  FactPerspective,
-  NoteSentiment,
-} from './types.js';
+import type { ExtractionDebug, ExtractionV2, FactPerspective, NoteSentiment } from './types.js';
 import { parseAndValidateExtractionV2Output, validateExtractionV2 } from './validate.js';
 
 const FAST_OUTPUT_TOKENS = 400;
@@ -31,7 +25,6 @@ export type ExtractionLaneResult = {
   model: string;
   status: 'ok' | 'error' | 'skipped';
   durationMs: number;
-  extraction?: Extraction;
   extractionV2?: ExtractionV2;
   debug?: ExtractionDebug;
   errorMessage?: string;
@@ -47,7 +40,6 @@ type LlamaServerRuntime = {
 };
 
 type ExtractionBundle = {
-  extraction: Extraction;
   extractionV2: ExtractionV2;
   debug: ExtractionDebug;
 };
@@ -390,7 +382,6 @@ const finalizeExtractionBundle = (
 ): ExtractionBundle => {
   const segmented = deriveSegments(validated, text);
   const extractionV2 = segmented.extraction;
-  const extraction = toExtractionV1(extractionV2, text);
 
   const debug: ExtractionDebug = {
     inputText: text,
@@ -398,7 +389,6 @@ const finalizeExtractionBundle = (
     rawModelOutput,
     validatedExtractionV2BeforeSegmentation: validated,
     finalExtractionV2: extractionV2,
-    finalExtractionV1: extraction,
     segmentationTrace: segmented.trace,
     runtime: {
       ...runtime,
@@ -408,7 +398,7 @@ const finalizeExtractionBundle = (
     errors,
   };
 
-  return { extraction, extractionV2, debug };
+  return { extractionV2, debug };
 };
 
 const spanFromRegexMatch = (match: RegExpExecArray | null): Span | null => {
@@ -858,87 +848,12 @@ const runCloudExtractionBundle = async (
   );
 };
 
-export const toExtractionV1 = (extractionV2: ExtractionV2, text: string): Extraction => {
-  const items: Extraction['items'] = [];
-  const itemByFactId = new Map<string, number>();
-  const itemByEntityId = new Map<string, number>();
-
-  for (const fact of extractionV2.facts) {
-    if (
-      fact.evidenceStart < 0 ||
-      fact.evidenceEnd <= fact.evidenceStart ||
-      fact.evidenceEnd > text.length
-    ) {
-      continue;
-    }
-
-    const value = text.slice(fact.evidenceStart, fact.evidenceEnd);
-    const itemIndex = items.length;
-    items.push({
-      label: `${fact.predicate}:${fact.perspective}`,
-      value,
-      start: fact.evidenceStart,
-      end: fact.evidenceEnd,
-      confidence: fact.confidence,
-    });
-    itemByFactId.set(fact.id, itemIndex);
-  }
-
-  for (const entity of extractionV2.entities) {
-    if (
-      entity.nameStart < 0 ||
-      entity.nameEnd <= entity.nameStart ||
-      entity.nameEnd > text.length
-    ) {
-      continue;
-    }
-
-    const value = text.slice(entity.nameStart, entity.nameEnd);
-    const itemIndex = items.length;
-    items.push({
-      label: entity.type,
-      value,
-      start: entity.nameStart,
-      end: entity.nameEnd,
-      confidence: entity.confidence,
-    });
-    itemByEntityId.set(entity.id, itemIndex);
-  }
-
-  const groups = extractionV2.groups.flatMap((group) => {
-    const fromEntities = group.entityIds.flatMap((entityId) => {
-      const index = itemByEntityId.get(entityId);
-      return index === undefined ? [] : [index];
-    });
-
-    const fromFacts = group.factIds.flatMap((factId) => {
-      const index = itemByFactId.get(factId);
-      return index === undefined ? [] : [index];
-    });
-
-    const itemIndexes = Array.from(new Set([...fromEntities, ...fromFacts]));
-    if (itemIndexes.length === 0) {
-      return [];
-    }
-
-    return [{ name: group.name, itemIndexes }];
-  });
-
-  return {
-    title: extractionV2.title,
-    memory: extractionV2.summary,
-    items,
-    groups,
-  };
-};
-
 export async function extractWithDebug(text: string): Promise<{
-  extraction: Extraction;
   extractionV2: ExtractionV2;
   debug: ExtractionDebug;
 }> {
   if (typeof text !== 'string' || text.length === 0) {
-    throw new Error('extract(text) requires a non-empty text string.');
+    throw new Error('extractWithDebug(text) requires a non-empty text string.');
   }
 
   const startedAt = Date.now();
@@ -1027,7 +942,6 @@ export async function extractCompareLane(
       model: lane.model,
       status: 'ok',
       durationMs: Date.now() - startedAt,
-      extraction: bundle.extraction,
       extractionV2: bundle.extractionV2,
       debug: bundle.debug,
     };
@@ -1058,9 +972,4 @@ export async function extractV2(text: string): Promise<ExtractionV2> {
   return result.extractionV2;
 }
 
-export async function extract(text: string): Promise<Extraction> {
-  const result = await extractWithDebug(text);
-  return result.extraction;
-}
-
-export type { Extraction, ExtractionDebug, ExtractionV2 } from './types.js';
+export type { ExtractionDebug, ExtractionV2 } from './types.js';

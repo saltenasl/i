@@ -60,6 +60,7 @@ describe('runtime migrations', () => {
     expect(applied).toContain('0002-add-notes-title-index');
     expect(applied).toContain('0003-create-extraction-history');
     expect(applied).toContain('0004-add-compare-lanes-to-extraction-history');
+    expect(applied).toContain('0005-drop-extraction-v1-json');
 
     const indexResult = await sql<{ name: string }>`
       PRAGMA index_list('notes')

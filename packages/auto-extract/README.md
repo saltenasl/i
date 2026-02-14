@@ -5,9 +5,9 @@
 ## Usage
 
 ```ts
-import { extract } from "@repo/auto-extract";
+import { extractV2 } from "@repo/auto-extract";
 
-const result = await extract("...");
+const result = await extractV2("...");
 ```
 
 On first call, assets are auto-downloaded to:

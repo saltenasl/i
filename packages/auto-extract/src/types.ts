@@ -1,19 +1,3 @@
-export type Extraction = {
-  title: string;
-  memory?: string;
-  items: Array<{
-    label: string;
-    value: string;
-    start: number;
-    end: number;
-    confidence: number;
-  }>;
-  groups: Array<{
-    name: string;
-    itemIndexes: number[];
-  }>;
-};
-
 export type NoteSentiment = 'positive' | 'negative' | 'neutral' | 'varied';
 export type EntityType = 'person' | 'org' | 'tool' | 'place' | 'concept' | 'event';
 export type FactPerspective = 'self' | 'other' | 'uncertain';
@@ -84,7 +68,6 @@ export type ExtractionDebug = {
   rawModelOutput: string;
   validatedExtractionV2BeforeSegmentation: ExtractionV2;
   finalExtractionV2: ExtractionV2;
-  finalExtractionV1: Extraction;
   segmentationTrace: Array<{
     segmentId: string;
     start: number;

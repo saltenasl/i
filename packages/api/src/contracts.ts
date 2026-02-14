@@ -19,28 +19,11 @@ export interface ExtractionHistoryEntryDto {
   id: string;
   sourceText: string;
   prompt: string;
-  extraction: Extraction;
   extractionV2: ExtractionV2;
   debug: ExtractionDebug;
   compareLanes?: ExtractionLaneResult[];
   createdAt: string;
 }
-
-export type Extraction = {
-  title: string;
-  memory?: string;
-  items: Array<{
-    label: string;
-    value: string;
-    start: number;
-    end: number;
-    confidence: number;
-  }>;
-  groups: Array<{
-    name: string;
-    itemIndexes: number[];
-  }>;
-};
 
 export type NoteSentiment = 'positive' | 'negative' | 'neutral' | 'varied';
 export type EntityType = 'person' | 'org' | 'tool' | 'place' | 'concept' | 'event';
@@ -112,7 +95,6 @@ export type ExtractionDebug = {
   rawModelOutput: string;
   validatedExtractionV2BeforeSegmentation: ExtractionV2;
   finalExtractionV2: ExtractionV2;
-  finalExtractionV1: Extraction;
   segmentationTrace: Array<{
     segmentId: string;
     start: number;
@@ -137,7 +119,6 @@ export type ExtractionLaneResult = {
   model: string;
   status: 'ok' | 'error' | 'skipped';
   durationMs: number;
-  extraction?: Extraction;
   extractionV2?: ExtractionV2;
   debug?: ExtractionDebug;
   errorMessage?: string;
@@ -163,10 +144,7 @@ export interface ApiMethodMap {
     input: {
       text: string;
     };
-    output: Result<
-      { extraction: Extraction; extractionV2: ExtractionV2; debug: ExtractionDebug },
-      AppErrorCode
-    >;
+    output: Result<{ extractionV2: ExtractionV2; debug: ExtractionDebug }, AppErrorCode>;
   };
   'extract.history.list': {
     input: {

@@ -56,7 +56,7 @@
 
 ## Current Execution Plan
 1. Stabilize global-context extraction pipeline in `@repo/auto-extract` with strict grounding and deterministic post-processing.
-2. Keep extraction API additive and graph-ready (`extraction`, `extractionV2`, `debug`) while preserving V1 compatibility.
+2. Keep extraction API additive and graph-ready around V2-only payloads (`extractionV2`, `debug`) with no V1 compatibility surface.
 3. Improve renderer extraction UX: highlighted source text, entity excerpts, fact ownership/perspective clarity, and debug-copy workflow.
 4. Maintain deterministic verification coverage (backend + RTL + E2E smoke) without brittle model-output assertions in E2E.
 5. Prepare next persistence phase by keeping `extractionV2` graph projection and segment metadata stable for DB storage.
@@ -80,7 +80,7 @@
 - Type safety convention: enforcement is part of `pnpm verify`, not a best-effort guideline.
 - Delivery convention: finish requests with a commit whenever work is completed.
 - Commit convention: use `git commit --no-gpg-sign ...` by default.
-- Auto-extract convention: `@repo/auto-extract` uses a local llama.cpp binary and local GGUF model auto-downloaded into `~/.auto-extract` with a single public API `extract(text)` and no Python runtime dependency.
+- Auto-extract convention: `@repo/auto-extract` uses a local llama.cpp binary and local GGUF model auto-downloaded into `~/.auto-extract`, exposes V2-first APIs (`extractV2`, `extractWithDebug`, compare lanes), and has no Python runtime dependency.
 - Package naming convention: all workspace packages must use the `@repo/*` scope prefix for consistency and tooling alignment.
 - Testing exception convention: for RTL/backend tests, `auto-extract` behavior may be mocked when needed for deterministic test coverage, with explicit user-approved intent documented in the test.
 - Auto-extract test convention: tests must not call real `@repo/auto-extract` inference by default; any temporary unmocking requires explicit per-task user permission and an in-file override marker documented with rationale, due cost and runtime volatility.
@@ -100,6 +100,7 @@
 - Segmentation convention: segments are additive debug metadata only; facts are the primary structured surface and must remain complete without segment reliance.
 - Extraction UI convention: renderer must not display segment cards/lists; segment data may remain in debug payloads/contracts only.
 - History compare convention: extraction history entries originating from A/B compare must preserve the full lane set (including skipped/error lanes) and render auto-expanded lane cards matching the live compare presentation.
+- V1 deprecation convention: extraction V1 payloads/types/debug fields are removed from API/runtime/UI; only V2 extraction contracts are supported.
 
 ## Convention Intake Process
 When a new user convention appears:

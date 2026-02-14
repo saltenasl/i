@@ -1,5 +1,4 @@
 import type {
-  Extraction,
   ExtractionDebug,
   ExtractionHistoryEntryDto,
   ExtractionLaneId,
@@ -249,12 +248,10 @@ const factTouchesEntity = (fact: ExtractionV2['facts'][number], entityId: string
 };
 
 const ExtractionContractView = ({
-  extraction,
   extractionV2,
   sourceText,
   debug,
 }: {
-  extraction: Extraction;
   extractionV2: ExtractionV2;
   sourceText: string;
   debug: ExtractionDebug;
@@ -428,7 +425,6 @@ const ExtractionContractView = ({
             rawModelOutput: debug.rawModelOutput,
             validatedExtractionV2BeforeSegmentation: debug.validatedExtractionV2BeforeSegmentation,
             finalExtractionV2: debug.finalExtractionV2,
-            finalExtractionV1: debug.finalExtractionV1,
             segmentationTrace: debug.segmentationTrace,
             runtime: debug.runtime,
             fallbackUsed: debug.fallbackUsed,
@@ -727,23 +723,6 @@ const ExtractionContractView = ({
           )}
         </ul>
       </div>
-
-      <details>
-        <summary>V1 Compatibility Output</summary>
-        <pre
-          data-testid="extraction-v1-json"
-          style={{
-            marginTop: 8,
-            border: '1px solid #d0d7de',
-            borderRadius: 8,
-            padding: 10,
-            whiteSpace: 'pre-wrap',
-            overflowX: 'auto',
-          }}
-        >
-          {JSON.stringify(extraction, null, 2)}
-        </pre>
-      </details>
     </section>
   );
 };
@@ -777,7 +756,6 @@ type CompareLaneUi = {
   model: string;
   status: 'loading' | 'ok' | 'error' | 'skipped';
   durationMs: number | null;
-  extraction?: Extraction;
   extractionV2?: ExtractionV2;
   debug?: ExtractionDebug;
   errorMessage?: string;
@@ -828,7 +806,6 @@ const toLaneUi = (lane: ExtractionLaneResult): CompareLaneUi => {
     model: lane.model,
     status: lane.status,
     durationMs: lane.durationMs,
-    ...(lane.extraction ? { extraction: lane.extraction } : {}),
     ...(lane.extractionV2 ? { extractionV2: lane.extractionV2 } : {}),
     ...(lane.debug ? { debug: lane.debug } : {}),
     ...(lane.errorMessage ? { errorMessage: lane.errorMessage } : {}),
@@ -950,7 +927,7 @@ const CompareLaneCard = ({
         </div>
       ) : null}
 
-      {lane.status === 'ok' && lane.extraction && lane.extractionV2 && lane.debug ? (
+      {lane.status === 'ok' && lane.extractionV2 && lane.debug ? (
         <div
           data-testid={`compare-lane-success-${lane.laneId}`}
           style={{ display: 'grid', gap: 10 }}
@@ -984,7 +961,6 @@ const CompareLaneCard = ({
               }}
             >
               <ExtractionContractView
-                extraction={lane.extraction}
                 extractionV2={lane.extractionV2}
                 sourceText={sourceText}
                 debug={lane.debug}
@@ -1010,7 +986,6 @@ const ExtractPage = () => {
   const [selectedHistoryIds, setSelectedHistoryIds] = useState<Set<string>>(new Set());
   const [copySelectedState, setCopySelectedState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [result, setResult] = useState<{
-    extraction: Extraction;
     extractionV2: ExtractionV2;
     debug: ExtractionDebug;
   } | null>(null);
@@ -1046,7 +1021,6 @@ const ExtractPage = () => {
 
     setError(null);
     setResult({
-      extraction: response.data.extraction,
       extractionV2: response.data.extractionV2,
       debug: response.data.debug,
     });
@@ -1119,7 +1093,6 @@ const ExtractPage = () => {
               createdAt: entry.createdAt,
               sourceText: entry.sourceText,
               prompt: entry.prompt,
-              extraction: entry.extraction,
               extractionV2: entry.extractionV2,
               debug: entry.debug,
               compareLanes: entry.compareLanes,
@@ -1138,7 +1111,6 @@ const ExtractPage = () => {
   const openHistoryEntry = (entry: ExtractionHistoryEntryDto) => {
     setText(entry.sourceText);
     setResult({
-      extraction: entry.extraction,
       extractionV2: entry.extractionV2,
       debug: entry.debug,
     });
@@ -1199,7 +1171,6 @@ const ExtractPage = () => {
       {result ? (
         <>
           <ExtractionContractView
-            extraction={result.extraction}
             extractionV2={result.extractionV2}
             sourceText={text}
             debug={result.debug}

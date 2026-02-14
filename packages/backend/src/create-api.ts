@@ -1,7 +1,6 @@
 import {
   type ApiHandlers,
   type ApiInput,
-  type Extraction,
   type ExtractionDebug,
   type ExtractionLaneId,
   type ExtractionLaneResult,
@@ -21,7 +20,6 @@ export interface BackendDependencies {
   db: DbClient;
   runExtractionBundle?: (text: string) => Promise<{
     extractionV2: ExtractionV2;
-    extraction: Extraction;
     debug: ExtractionDebug;
   }>;
   runExtractionCompareLane?: (
@@ -62,7 +60,6 @@ export const createBackendHandlers = (deps: BackendDependencies): ApiHandlers =>
       await persistExtractionHistoryService(deps.db, {
         sourceText: text,
         prompt: bundle.debug.prompt,
-        extraction: bundle.extraction,
         extractionV2: bundle.extractionV2,
         debug: bundle.debug,
       });
@@ -106,17 +103,12 @@ export const createBackendHandlers = (deps: BackendDependencies): ApiHandlers =>
     try {
       const compare = await (deps.runExtractionCompare ?? extractCompare)(text);
       const representativeLane = compare.lanes.find(
-        (lane) => lane.status === 'ok' && lane.extraction && lane.extractionV2 && lane.debug,
+        (lane) => lane.status === 'ok' && lane.extractionV2 && lane.debug,
       );
-      if (
-        representativeLane?.extraction &&
-        representativeLane.extractionV2 &&
-        representativeLane.debug
-      ) {
+      if (representativeLane?.extractionV2 && representativeLane.debug) {
         await persistExtractionHistoryService(deps.db, {
           sourceText: text,
           prompt: representativeLane.debug.prompt,
-          extraction: representativeLane.extraction,
           extractionV2: representativeLane.extractionV2,
           debug: representativeLane.debug,
           compareLanes: compare.lanes,

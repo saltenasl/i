@@ -1,16 +1,4 @@
-import type {
-  EntityType,
-  Extraction,
-  ExtractionV2,
-  FactPerspective,
-  NoteSentiment,
-} from './types.js';
-
-type RequiredMention = {
-  start: number;
-  end: number;
-  value: string;
-};
+import type { EntityType, ExtractionV2, FactPerspective, NoteSentiment } from './types.js';
 
 const TAXONOMY = [
   'people',
@@ -218,147 +206,6 @@ const normalizeSpan = (
     start: repairedStart,
     end: repairedStart + value.length,
   };
-};
-
-const mentionPatterns: RegExp[] = [
-  /\b(?:gemma(?:\s+\d+(?:\.\d+)?b)?(?:\s+q\d+)?)\b/gi,
-  /\bllama\.cpp\b/gi,
-  /\bgguf\b/gi,
-  /\bq\d+\b/gi,
-  /\b(?:under|within|less than|<=?)\s+\d+(?:\.\d+)?\s*(?:gb|mb)\s*ram\b/gi,
-  /--[a-zA-Z0-9-]+(?:=[^\s]+)?/g,
-  /\bconfig(?:uration)?\b/gi,
-];
-
-const collectRequiredMentions = (text: string): RequiredMention[] => {
-  const mentions: RequiredMention[] = [];
-  const seen = new Set<string>();
-
-  for (const pattern of mentionPatterns) {
-    pattern.lastIndex = 0;
-    for (const match of text.matchAll(pattern)) {
-      const value = match[0];
-      const start = match.index;
-      if (start === undefined) {
-        continue;
-      }
-
-      const end = start + value.length;
-      const key = `${start}:${end}:${value.toLowerCase()}`;
-      if (seen.has(key)) {
-        continue;
-      }
-
-      seen.add(key);
-      mentions.push({ start, end, value });
-    }
-  }
-
-  return mentions;
-};
-
-const assertMentionCoverage = (text: string, extraction: Extraction): void => {
-  const requiredMentions = collectRequiredMentions(text);
-
-  for (const mention of requiredMentions) {
-    const covered = extraction.items.some(
-      (item) => item.start <= mention.start && item.end >= mention.end,
-    );
-
-    if (!covered) {
-      throw new Error(`Missing required explicit mention extraction: "${mention.value}".`);
-    }
-  }
-};
-
-export const validateExtraction = (text: string, raw: unknown): Extraction => {
-  if (!isObject(raw)) {
-    throw new Error('Extraction must be an object.');
-  }
-
-  const title = parseString(raw.title, 'title');
-  if (title.length > 25) {
-    throw new Error('title must be 25 characters or fewer.');
-  }
-
-  const memory = parseOptionalString(raw.memory, 'memory');
-
-  if (!Array.isArray(raw.items)) {
-    throw new Error('items must be an array.');
-  }
-
-  const items = raw.items.flatMap((itemRaw, index) => {
-    if (!isObject(itemRaw)) {
-      throw new Error(`items[${index}] must be an object.`);
-    }
-
-    const label = parseString(itemRaw.label, `items[${index}].label`);
-    const value = parseString(itemRaw.value, `items[${index}].value`);
-    const start = parseNumber(itemRaw.start, `items[${index}].start`);
-    const end = parseNumber(itemRaw.end, `items[${index}].end`);
-    const confidence = parseNumber(itemRaw.confidence, `items[${index}].confidence`);
-
-    if (confidence < 0 || confidence > 1) {
-      throw new Error(`items[${index}].confidence must be in [0,1].`);
-    }
-
-    const span = normalizeSpan(text, value, start, end);
-    if (!span) {
-      return [];
-    }
-
-    return [
-      {
-        label,
-        value,
-        start: span.start,
-        end: span.end,
-        confidence,
-      },
-    ];
-  });
-
-  if (!Array.isArray(raw.groups)) {
-    throw new Error('groups must be an array.');
-  }
-
-  const groups = raw.groups.map((groupRaw, index) => {
-    if (!isObject(groupRaw)) {
-      throw new Error(`groups[${index}] must be an object.`);
-    }
-
-    const name = parseString(groupRaw.name, `groups[${index}].name`);
-    const itemIndexesRaw = groupRaw.itemIndexes;
-    if (!Array.isArray(itemIndexesRaw)) {
-      throw new Error(`groups[${index}].itemIndexes must be an array.`);
-    }
-
-    const itemIndexes = itemIndexesRaw.flatMap((itemIndex, itemIndexPos) => {
-      const parsedIndex = parseNumber(itemIndex, `groups[${index}].itemIndexes[${itemIndexPos}]`);
-      if (!Number.isInteger(parsedIndex)) {
-        throw new Error(`groups[${index}].itemIndexes[${itemIndexPos}] must be an integer.`);
-      }
-
-      if (parsedIndex < 0 || parsedIndex >= items.length) {
-        return [];
-      }
-
-      return [parsedIndex];
-    });
-
-    return { name, itemIndexes };
-  });
-
-  const extraction: Extraction = {
-    title,
-    items,
-    groups,
-    ...(memory === undefined ? {} : { memory }),
-  };
-
-  assertMentionCoverage(text, extraction);
-
-  return extraction;
 };
 
 const toTaxonomyName = (name: string): TaxonomyName | null => {
@@ -918,10 +765,6 @@ export const validateExtractionV2 = (text: string, raw: unknown): ExtractionV2 =
     ...extraction,
     groups: normalizeGroupsV2(extraction),
   };
-};
-
-export const parseAndValidateExtractionOutput = (text: string, rawOutput: string): Extraction => {
-  return validateExtraction(text, parseJsonObjectFromOutput(rawOutput));
 };
 
 export const parseAndValidateExtractionV2Output = (

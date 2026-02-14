@@ -1,5 +1,4 @@
 import type {
-  Extraction,
   ExtractionDebug,
   ExtractionHistoryEntryDto,
   ExtractionLaneResult,
@@ -25,7 +24,6 @@ const mapExtractionHistoryRow = (row: ExtractionHistoryRow): ExtractionHistoryEn
   id: row.id,
   sourceText: row.source_text,
   prompt: row.prompt,
-  extraction: parseJson<Extraction>(row.extraction_json, 'extraction_json'),
   extractionV2: parseJson<ExtractionV2>(row.extraction_v2_json, 'extraction_v2_json'),
   debug: parseJson<ExtractionDebug>(row.debug_json, 'debug_json'),
   ...(row.compare_lanes_json
@@ -42,7 +40,6 @@ const mapExtractionHistoryRow = (row: ExtractionHistoryRow): ExtractionHistoryEn
 export interface CreateExtractionHistoryInput {
   sourceText: string;
   prompt: string;
-  extraction: Extraction;
   extractionV2: ExtractionV2;
   debug: ExtractionDebug;
   compareLanes?: ExtractionLaneResult[];
@@ -61,7 +58,6 @@ export const createExtractionHistoryEntry = async (
       id,
       source_text: input.sourceText,
       prompt: input.prompt,
-      extraction_json: JSON.stringify(input.extraction),
       extraction_v2_json: JSON.stringify(input.extractionV2),
       debug_json: JSON.stringify(input.debug),
       compare_lanes_json: input.compareLanes ? JSON.stringify(input.compareLanes) : null,

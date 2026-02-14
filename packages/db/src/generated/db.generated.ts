@@ -9,7 +9,6 @@ export interface ExtractionHistoryTable {
   id: string;
   source_text: string;
   prompt: string;
-  extraction_json: string;
   extraction_v2_json: string;
   debug_json: string;
   created_at: string;

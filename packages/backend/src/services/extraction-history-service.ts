@@ -1,4 +1,4 @@
-import type { Extraction, ExtractionDebug, ExtractionLaneResult, ExtractionV2 } from '@repo/api';
+import type { ExtractionDebug, ExtractionLaneResult, ExtractionV2 } from '@repo/api';
 import { type ApiMethodMap, ok } from '@repo/api';
 import type { DbClient } from '@repo/db';
 import {
@@ -32,7 +32,6 @@ export const listExtractionHistoryService = async (
 export interface PersistExtractionHistoryInput {
   sourceText: string;
   prompt: string;
-  extraction: Extraction;
   extractionV2: ExtractionV2;
   debug: ExtractionDebug;
   compareLanes?: ExtractionLaneResult[];
@@ -45,7 +44,6 @@ export const persistExtractionHistoryService = async (
   await createExtractionHistoryEntry(db, {
     sourceText: input.sourceText,
     prompt: input.prompt,
-    extraction: input.extraction,
     extractionV2: input.extractionV2,
     debug: input.debug,
     ...(input.compareLanes ? { compareLanes: input.compareLanes } : {}),

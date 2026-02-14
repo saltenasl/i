@@ -100,19 +100,6 @@ describe('createBackendHandlers', () => {
     const handlers = createBackendHandlers({
       db: harness.db,
       runExtractionBundle: async (text) => ({
-        extraction: {
-          title: 'Extracted',
-          items: [
-            {
-              label: 'tool',
-              value: 'llama.cpp',
-              start: text.indexOf('llama.cpp'),
-              end: text.indexOf('llama.cpp') + 'llama.cpp'.length,
-              confidence: 0.9,
-            },
-          ],
-          groups: [{ name: 'tools', itemIndexes: [0] }],
-        },
         extractionV2: {
           title: 'Extracted',
           noteType: 'reference',
@@ -190,7 +177,6 @@ describe('createBackendHandlers', () => {
             groups: [],
             segments: [],
           },
-          finalExtractionV1: { title: 'Extracted', items: [], groups: [] },
           segmentationTrace: [],
           runtime: {
             modelPath: '/tmp/model.gguf',
@@ -210,8 +196,6 @@ describe('createBackendHandlers', () => {
       return;
     }
 
-    expect(result.data.extraction.title).toBe('Extracted');
-    expect(result.data.extraction.items[0]?.value).toBe('llama.cpp');
     expect(result.data.extractionV2.entities[0]?.name).toBe('llama.cpp');
     expect(result.data.debug.runtime.serverMode).toBe('cpu');
 
@@ -234,7 +218,6 @@ describe('createBackendHandlers', () => {
     const handlers = createBackendHandlers({
       db: harness.db,
       runExtractionBundle: async (text) => ({
-        extraction: { title: text.slice(0, 12), items: [], groups: [] },
         extractionV2: {
           title: text.slice(0, 12),
           noteType: 'personal',
@@ -281,7 +264,6 @@ describe('createBackendHandlers', () => {
             groups: [],
             segments: [],
           },
-          finalExtractionV1: { title: text.slice(0, 12), items: [], groups: [] },
           segmentationTrace: [],
           runtime: {
             modelPath: '/tmp/model.gguf',
@@ -332,7 +314,6 @@ describe('createBackendHandlers', () => {
         model: laneId,
         status: 'ok',
         durationMs: 5,
-        extraction: { title: text.slice(0, 10), items: [], groups: [] },
         extractionV2: {
           title: 'Lane',
           noteType: 'personal',
@@ -379,7 +360,6 @@ describe('createBackendHandlers', () => {
             groups: [],
             segments: [],
           },
-          finalExtractionV1: { title: 'Lane', items: [], groups: [] },
           segmentationTrace: [],
           runtime: {
             modelPath: 'lane',
@@ -429,7 +409,6 @@ describe('createBackendHandlers', () => {
             model: 'local-llama.cpp',
             status: 'ok',
             durationMs: 10,
-            extraction: { title: 'Local', items: [], groups: [] },
             extractionV2: {
               title: 'Local',
               noteType: 'personal',
@@ -476,7 +455,6 @@ describe('createBackendHandlers', () => {
                 groups: [],
                 segments: [],
               },
-              finalExtractionV1: { title: 'Local', items: [], groups: [] },
               segmentationTrace: [],
               runtime: {
                 modelPath: 'local',

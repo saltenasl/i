@@ -110,19 +110,6 @@ describe('App (RTL with real backend implementation)', () => {
       createBackendHandlers({
         db: harness.db,
         runExtractionBundle: async () => ({
-          extraction: {
-            title: 'Winter Drive',
-            items: [
-              {
-                label: 'called_road_maintenance:self',
-                value: 'I called road maintenance',
-                start: 0,
-                end: 24,
-                confidence: 0.9,
-              },
-            ],
-            groups: [{ name: 'actions', itemIndexes: [0] }],
-          },
           extractionV2: {
             title: 'Winter Drive',
             noteType: 'personal',
@@ -253,11 +240,6 @@ describe('App (RTL with real backend implementation)', () => {
               groups: [],
               segments: [],
             },
-            finalExtractionV1: {
-              title: 'Winter Drive',
-              items: [],
-              groups: [],
-            },
             segmentationTrace: [],
             runtime: {
               modelPath: '/tmp/model.gguf',
@@ -306,7 +288,6 @@ describe('App (RTL with real backend implementation)', () => {
     await user.unhover(screen.getByTestId('fact-row-fact_scared'));
     expect(firstSourceEgleHighlight).toHaveAttribute('data-active', 'false');
     expect(screen.getByTestId('extraction-v2-groups')).toHaveTextContent('people');
-    expect(screen.getByTestId('extraction-v1-json')).toHaveTextContent('Winter Drive');
 
     await user.click(screen.getByTestId('copy-debug-bundle'));
     expect(clipboardMock).toHaveBeenCalledTimes(1);
@@ -343,11 +324,6 @@ describe('App (RTL with real backend implementation)', () => {
               model: 'local-llama.cpp',
               status: 'ok',
               durationMs: 10,
-              extraction: {
-                title: 'Local',
-                items: [],
-                groups: [],
-              },
               extractionV2: {
                 title: 'Local',
                 noteType: 'personal',
@@ -394,7 +370,6 @@ describe('App (RTL with real backend implementation)', () => {
                   groups: [],
                   segments: [],
                 },
-                finalExtractionV1: { title: 'Local', items: [], groups: [] },
                 segmentationTrace: [],
                 runtime: {
                   modelPath: 'local',
