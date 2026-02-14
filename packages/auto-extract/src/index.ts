@@ -53,6 +53,8 @@ type ExtractionBundle = {
   debug: ExtractionDebug;
 };
 
+const NARRATOR_ENTITY_ID = 'ent_self';
+
 let assetsPromise: ReturnType<typeof ensureAssets> | undefined;
 let runtimePromise: Promise<LlamaServerRuntime> | undefined;
 
@@ -385,6 +387,18 @@ const isNarratorPronoun = (value: string): boolean => {
   return /^(?:i|me|my|mine|we|our|us)$/i.test(value.trim());
 };
 
+const isNarratorEntity = (entity: ExtractionV2['entities'][number]): boolean => {
+  if (entity.id === NARRATOR_ENTITY_ID) {
+    return true;
+  }
+
+  if (isNarratorPronoun(entity.name)) {
+    return true;
+  }
+
+  return entity.context?.toLowerCase().includes('narrator') ?? false;
+};
+
 const nextEntityId = (entities: ExtractionV2['entities']): string => {
   const seen = new Set(entities.map((entity) => entity.id));
   let value = entities.length + 1;
@@ -510,7 +524,7 @@ const deriveSegments = (
 
 const ensureSelfOwnership = (extraction: ExtractionV2, text: string): ExtractionV2 => {
   const seenEntityIds = new Set<string>();
-  const entities = extraction.entities.filter((entity) => {
+  const dedupedEntities = extraction.entities.filter((entity) => {
     if (seenEntityIds.has(entity.id)) {
       return false;
     }
@@ -518,17 +532,12 @@ const ensureSelfOwnership = (extraction: ExtractionV2, text: string): Extraction
     return true;
   });
 
-  let selfEntity = entities.find((entity) => {
-    if (isNarratorPronoun(entity.name)) {
-      return true;
-    }
-    return entity.context?.toLowerCase().includes('narrator') ?? false;
-  });
+  let selfEntity = dedupedEntities.find((entity) => isNarratorEntity(entity));
 
   const pronounSpan = findFirstPronounSpan(text);
   if (!selfEntity && pronounSpan) {
     selfEntity = {
-      id: nextEntityId(entities),
+      id: NARRATOR_ENTITY_ID,
       name: text.slice(pronounSpan.start, pronounSpan.end),
       type: 'person',
       nameStart: pronounSpan.start,
@@ -536,42 +545,68 @@ const ensureSelfOwnership = (extraction: ExtractionV2, text: string): Extraction
       context: 'narrator',
       confidence: 0.75,
     };
-    entities.push(selfEntity);
   }
+
+  const oldSelfId = selfEntity?.id;
+  const entities = dedupedEntities.filter((entity) => !isNarratorEntity(entity));
+  if (selfEntity) {
+    entities.push({
+      ...selfEntity,
+      id: NARRATOR_ENTITY_ID,
+      context: selfEntity.context?.toLowerCase().includes('narrator')
+        ? selfEntity.context
+        : selfEntity.context
+          ? `${selfEntity.context}; narrator`
+          : 'narrator',
+    });
+  }
+
+  const remapEntityId = (entityId: string | undefined): string | undefined => {
+    if (!entityId) {
+      return undefined;
+    }
+
+    if (entityId === oldSelfId || entityId === NARRATOR_ENTITY_ID) {
+      return NARRATOR_ENTITY_ID;
+    }
+
+    return entityId;
+  };
 
   const entityIdSet = new Set(entities.map((entity) => entity.id));
 
   const facts = extraction.facts.flatMap((fact) => {
     const evidence = text.slice(fact.evidenceStart, fact.evidenceEnd);
-    const firstPersonEvidence = /\b(i|me|my|mine|we|our|us)\b/i.test(evidence);
     const startsWithFirstPerson = /^\s*(?:i|i'm|ive|i’ve|we|we're|weve|we’ve|me|my|our|us)\b/i.test(
       evidence,
     );
+    const startsWithThirdPerson = /^\s*(?:he|she|they|it|his|her|their|egle)\b/i.test(evidence);
+    const subjectEntityId = remapEntityId(fact.subjectEntityId);
     const ownerFromSubject =
-      fact.subjectEntityId && entityIdSet.has(fact.subjectEntityId)
-        ? fact.subjectEntityId
-        : undefined;
+      subjectEntityId && entityIdSet.has(subjectEntityId) ? subjectEntityId : undefined;
+    const ownerFromFact = remapEntityId(fact.ownerEntityId);
+    const objectEntityId = remapEntityId(fact.objectEntityId);
 
     const shouldForceSelf =
-      Boolean(selfEntity) &&
-      (fact.perspective === 'self' ||
-        startsWithFirstPerson ||
-        (firstPersonEvidence && (!ownerFromSubject || ownerFromSubject === selfEntity?.id)));
+      Boolean(selfEntity) && (fact.perspective === 'self' || startsWithFirstPerson);
 
     const ownerEntityId = shouldForceSelf
-      ? selfEntity?.id
-      : entityIdSet.has(fact.ownerEntityId)
-        ? fact.ownerEntityId
-        : (ownerFromSubject ?? selfEntity?.id);
+      ? NARRATOR_ENTITY_ID
+      : ownerFromFact && entityIdSet.has(ownerFromFact)
+        ? ownerFromFact
+        : ownerFromSubject;
 
     if (!ownerEntityId) {
       return [];
     }
 
     let perspective: FactPerspective = fact.perspective;
-    if (ownerEntityId === selfEntity?.id) {
+    if (ownerEntityId === NARRATOR_ENTITY_ID) {
       perspective = 'self';
-    } else if (ownerFromSubject && ownerFromSubject !== selfEntity?.id) {
+    } else if (
+      startsWithThirdPerson ||
+      (ownerFromSubject && ownerFromSubject !== NARRATOR_ENTITY_ID)
+    ) {
       perspective = 'other';
     } else if (perspective !== 'self' && perspective !== 'other') {
       perspective = 'uncertain';
@@ -582,19 +617,44 @@ const ensureSelfOwnership = (extraction: ExtractionV2, text: string): Extraction
         ...fact,
         ownerEntityId,
         perspective,
+        ...(subjectEntityId ? { subjectEntityId } : {}),
+        ...(objectEntityId ? { objectEntityId } : {}),
       },
     ];
   });
+
+  const relations = extraction.relations.map((relation) => ({
+    ...relation,
+    fromEntityId: remapEntityId(relation.fromEntityId) ?? relation.fromEntityId,
+    toEntityId: remapEntityId(relation.toEntityId) ?? relation.toEntityId,
+  }));
+
+  const groups = extraction.groups.map((group) => ({
+    ...group,
+    entityIds: Array.from(
+      new Set(group.entityIds.map((entityId) => remapEntityId(entityId) ?? entityId)),
+    ),
+  }));
+
+  const segments = extraction.segments.map((segment) => ({
+    ...segment,
+    entityIds: Array.from(
+      new Set(segment.entityIds.map((entityId) => remapEntityId(entityId) ?? entityId)),
+    ),
+  }));
 
   return {
     ...extraction,
     entities,
     facts,
+    relations,
+    groups,
+    segments,
   };
 };
 
 const enrichTodoFacts = (extraction: ExtractionV2, text: string): ExtractionV2 => {
-  const selfEntity = extraction.entities.find((entity) => isNarratorPronoun(entity.name));
+  const selfEntity = extraction.entities.find((entity) => isNarratorEntity(entity));
   if (!selfEntity) {
     return extraction;
   }
@@ -660,7 +720,7 @@ const buildFallbackExtractionV2 = (text: string): ExtractionV2 => {
   const selfSpan = findFirstPronounSpan(text);
   const selfId = selfSpan
     ? (() => {
-        const id = `ent_${entities.length + 1}`;
+        const id = NARRATOR_ENTITY_ID;
         entities.push({
           id,
           name: text.slice(selfSpan.start, selfSpan.end),
@@ -830,9 +890,7 @@ const runCloudExtractionBundle = async (
   const system = buildSystemPromptV2();
   const errors: string[] = [];
   let rawModelOutput = '';
-  let fallbackUsed = false;
-
-  let validated = buildFallbackExtractionV2(text);
+  let validated: ExtractionV2 | null = null;
 
   try {
     const model =
@@ -857,14 +915,15 @@ const runCloudExtractionBundle = async (
     validated = enrichTodoFacts(ensureSelfOwnership(parsed, text), text);
 
     if (validated.entities.length === 0 && validated.facts.length === 0) {
-      fallbackUsed = true;
-      validated = buildFallbackExtractionV2(text);
-      errors.push('Model output had no entities/facts.');
+      throw new Error('Model output had no entities/facts.');
     }
   } catch (error) {
-    fallbackUsed = true;
     errors.push(error instanceof Error ? error.message : String(error));
-    validated = buildFallbackExtractionV2(text);
+    throw new Error(errors.join(' | '));
+  }
+
+  if (!validated) {
+    throw new Error('Cloud extraction validation failed with no parsed result.');
   }
 
   const meta = laneMeta[laneId];
@@ -880,7 +939,7 @@ const runCloudExtractionBundle = async (
       nPredict: CLOUD_OUTPUT_TOKENS,
       totalMs: 0,
     },
-    fallbackUsed,
+    false,
     errors,
   );
 };
@@ -1048,6 +1107,20 @@ export async function extractCompareLane(
       laneId === 'local-llama'
         ? await extractWithDebug(text)
         : await runCloudExtractionBundle(text, laneId);
+
+    if (bundle.debug.fallbackUsed) {
+      return {
+        laneId,
+        provider: lane.provider,
+        model: lane.model,
+        status: 'error',
+        durationMs: Date.now() - startedAt,
+        extraction: bundle.extraction,
+        extractionV2: bundle.extractionV2,
+        debug: bundle.debug,
+        errorMessage: bundle.debug.errors[0] ?? 'Fallback extraction was used.',
+      };
+    }
 
     return {
       laneId,

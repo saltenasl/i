@@ -706,16 +706,12 @@ export const validateExtractionV2 = (text: string, raw: unknown): ExtractionV2 =
       objectEntityIdRaw && entityIdSet.has(objectEntityIdRaw) ? objectEntityIdRaw : undefined;
 
     const ownerEntityId =
-      ownerEntityIdRaw && entityIdSet.has(ownerEntityIdRaw) ? ownerEntityIdRaw : subjectEntityId;
+      ownerEntityIdRaw ?? subjectEntityIdRaw ?? subjectEntityId ?? `unresolved_owner_${index + 1}`;
 
     const perspective =
       perspectiveRaw && perspectiveValues.includes(perspectiveRaw as FactPerspective)
         ? (perspectiveRaw as FactPerspective)
         : 'uncertain';
-
-    if (!ownerEntityId) {
-      return [];
-    }
 
     return [
       {
