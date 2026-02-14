@@ -5,6 +5,7 @@
 - Prefer KISS over abstraction-heavy designs.
 - Optimize for deterministic, headless feedback loops that can run in CLI agents.
 - Favor real implementation tests (real DB, real IPC in E2E) over synthetic mocks.
+- Build graph-ready personal note extraction that preserves full-note context while remaining strictly span-grounded.
 
 ## Hard Rules
 - Commits must be self-contained and complete.
@@ -52,13 +53,11 @@
 9. No warnings emitted in command output.
 
 ## Current Execution Plan
-1. Bootstrap pnpm workspace + TypeScript project refs + Biome.
-2. Add Electron + Vite React app skeleton with shared API contract package.
-3. Implement typed IPC bridge and backend handlers.
-4. Implement Kysely DB package, migrations, startup migration execution.
-5. Add backend/RTL/E2E tests using real implementation paths.
-6. Add enforcement scripts: architecture, no-mocks, DB drift, migration discipline.
-7. Add pre-commit hook running `pnpm verify`.
+1. Stabilize global-context extraction pipeline in `@repo/auto-extract` with strict grounding and deterministic post-processing.
+2. Keep extraction API additive and graph-ready (`extraction`, `extractionV2`, `debug`) while preserving V1 compatibility.
+3. Improve renderer extraction UX: highlighted source text, entity excerpts, fact ownership/perspective clarity, segment cards, debug-copy workflow.
+4. Maintain deterministic verification coverage (backend + RTL + E2E smoke) without brittle model-output assertions in E2E.
+5. Prepare next persistence phase by keeping `extractionV2` graph projection and segment metadata stable for DB storage.
 
 ## Decision Log
 - Chosen stack: pnpm workspace, electron-vite, Vite React, Vitest, Playwright Electron, Biome.
@@ -80,6 +79,14 @@
 - Auto-extract convention: `@repo/auto-extract` uses a local llama.cpp binary and local GGUF model auto-downloaded into `~/.auto-extract` with a single public API `extract(text)` and no Python runtime dependency.
 - Package naming convention: all workspace packages must use the `@repo/*` scope prefix for consistency and tooling alignment.
 - Testing exception convention: for RTL/backend tests, `auto-extract` behavior may be mocked when needed for deterministic test coverage, with explicit user-approved intent documented in the test.
+- Extraction pipeline convention: run one whole-note LLM extraction pass first (global-context), then deterministically derive segments from grounded spans; do not pre-split into multiple LLM calls by default.
+- Attribution convention: every fact must carry `ownerEntityId` and `perspective` (`self`/`other`/`uncertain`) to avoid conflating narrator facts with other entities.
+- Sentiment convention: use per-segment sentiment as primary query surface; top-level sentiment is a rollup and uses `varied` when segments differ.
+- UI convention: extraction page must show original source text with color-matched entity highlights and excerpt snippets in the entity list.
+- Debugging convention: extraction UI must provide a one-click debug export containing prompt, raw model output, validated/final payloads, segmentation trace, runtime metadata, and fallback/error info.
+- E2E extraction convention: keep E2E assertions at smoke level for extraction UI controls (textarea + submit, fresh + seeded profiles), not model-inference content assertions.
+- Runtime constraint convention: extraction must use local llama.cpp + local GGUF only (no Python), with first-call auto-download into `~/.auto-extract`.
+- Latency target convention: optimize extraction for practical local responsiveness with a working target around <=2s on supported hardware/model, while prioritizing correctness and grounding over unrealistic token-speed assumptions.
 
 ## Convention Intake Process
 When a new user convention appears:
