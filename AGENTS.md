@@ -61,6 +61,7 @@
 4. Maintain deterministic verification coverage (backend + RTL + E2E smoke) without brittle model-output assertions in E2E.
 5. Prepare next persistence phase by keeping `extractionV2` graph projection and segment metadata stable for DB storage.
 6. Add side-by-side extraction A/B benchmarking lanes (local llama + Claude + OpenAI) with additive API contracts and explicit loading/progress UX.
+7. Persist full A/B compare lane snapshots in extraction history and render them as auto-expanded historical lane rows.
 
 ## Decision Log
 - Chosen stack: pnpm workspace, electron-vite, Vite React, Vitest, Playwright Electron, Biome.
@@ -98,6 +99,7 @@
 - Task extraction convention: detect TODO/task intent from note text and represent it as self-owned grounded facts when present.
 - Segmentation convention: segments are additive debug metadata only; facts are the primary structured surface and must remain complete without segment reliance.
 - Extraction UI convention: renderer must not display segment cards/lists; segment data may remain in debug payloads/contracts only.
+- History compare convention: extraction history entries originating from A/B compare must preserve the full lane set (including skipped/error lanes) and render auto-expanded lane cards matching the live compare presentation.
 
 ## Convention Intake Process
 When a new user convention appears:

@@ -314,7 +314,7 @@ describe('createBackendHandlers', () => {
     expect(invalidLimit.data.entries).toHaveLength(3);
   });
 
-  it('runs compare lane through injected lane dependency', async () => {
+  it('runs compare lane through injected lane dependency without persisting history rows', async () => {
     if (!harness) {
       throw new Error('DB harness was not initialized.');
     }
@@ -411,18 +411,17 @@ describe('createBackendHandlers', () => {
     if (!history.ok) {
       return;
     }
-    expect(history.data.entries).toHaveLength(1);
-    expect(history.data.entries[0]?.sourceText).toBe('Compare this text');
+    expect(history.data.entries).toHaveLength(0);
   });
 
-  it('runs compare through injected compare dependency', async () => {
+  it('runs compare through injected compare dependency and persists full lane snapshot', async () => {
     if (!harness) {
       throw new Error('DB harness was not initialized.');
     }
 
     const handlers = createBackendHandlers({
       db: harness.db,
-      runExtractionCompare: async () => ({
+      runExtractionCompare: async (text) => ({
         lanes: [
           {
             laneId: 'local-llama',
@@ -430,6 +429,64 @@ describe('createBackendHandlers', () => {
             model: 'local-llama.cpp',
             status: 'ok',
             durationMs: 10,
+            extraction: { title: 'Local', items: [], groups: [] },
+            extractionV2: {
+              title: 'Local',
+              noteType: 'personal',
+              summary: 'Local summary',
+              language: 'en',
+              date: null,
+              sentiment: 'neutral',
+              emotions: [],
+              entities: [],
+              facts: [],
+              relations: [],
+              groups: [],
+              segments: [],
+            },
+            debug: {
+              inputText: text,
+              prompt: 'compare prompt',
+              rawModelOutput: '{}',
+              validatedExtractionV2BeforeSegmentation: {
+                title: 'Local',
+                noteType: 'personal',
+                summary: 'Local summary',
+                language: 'en',
+                date: null,
+                sentiment: 'neutral',
+                emotions: [],
+                entities: [],
+                facts: [],
+                relations: [],
+                groups: [],
+                segments: [],
+              },
+              finalExtractionV2: {
+                title: 'Local',
+                noteType: 'personal',
+                summary: 'Local summary',
+                language: 'en',
+                date: null,
+                sentiment: 'neutral',
+                emotions: [],
+                entities: [],
+                facts: [],
+                relations: [],
+                groups: [],
+                segments: [],
+              },
+              finalExtractionV1: { title: 'Local', items: [], groups: [] },
+              segmentationTrace: [],
+              runtime: {
+                modelPath: 'local',
+                serverMode: 'cpu',
+                nPredict: 220,
+                totalMs: 10,
+              },
+              fallbackUsed: false,
+              errors: [],
+            },
           },
           {
             laneId: 'anthropic-haiku',
@@ -466,6 +523,9 @@ describe('createBackendHandlers', () => {
     if (!history.ok) {
       return;
     }
-    expect(history.data.entries).toHaveLength(0);
+    expect(history.data.entries).toHaveLength(1);
+    expect(history.data.entries[0]?.sourceText).toBe('Compare all lanes');
+    expect(history.data.entries[0]?.compareLanes).toHaveLength(3);
+    expect(history.data.entries[0]?.compareLanes?.[1]?.status).toBe('skipped');
   });
 });

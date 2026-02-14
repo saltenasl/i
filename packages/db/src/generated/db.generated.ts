@@ -13,6 +13,7 @@ export interface ExtractionHistoryTable {
   extraction_v2_json: string;
   debug_json: string;
   created_at: string;
+  compare_lanes_json: string | null;
 }
 export interface NotesTable {
   id: string;

@@ -2,6 +2,7 @@ import type {
   Extraction,
   ExtractionDebug,
   ExtractionHistoryEntryDto,
+  ExtractionLaneResult,
   ExtractionV2,
 } from '@repo/api';
 import type { Database, DbClient } from '@repo/db';
@@ -27,6 +28,14 @@ const mapExtractionHistoryRow = (row: ExtractionHistoryRow): ExtractionHistoryEn
   extraction: parseJson<Extraction>(row.extraction_json, 'extraction_json'),
   extractionV2: parseJson<ExtractionV2>(row.extraction_v2_json, 'extraction_v2_json'),
   debug: parseJson<ExtractionDebug>(row.debug_json, 'debug_json'),
+  ...(row.compare_lanes_json
+    ? {
+        compareLanes: parseJson<ExtractionLaneResult[]>(
+          row.compare_lanes_json,
+          'compare_lanes_json',
+        ),
+      }
+    : {}),
   createdAt: row.created_at,
 });
 
@@ -36,6 +45,7 @@ export interface CreateExtractionHistoryInput {
   extraction: Extraction;
   extractionV2: ExtractionV2;
   debug: ExtractionDebug;
+  compareLanes?: ExtractionLaneResult[];
 }
 
 export const createExtractionHistoryEntry = async (
@@ -54,6 +64,7 @@ export const createExtractionHistoryEntry = async (
       extraction_json: JSON.stringify(input.extraction),
       extraction_v2_json: JSON.stringify(input.extractionV2),
       debug_json: JSON.stringify(input.debug),
+      compare_lanes_json: input.compareLanes ? JSON.stringify(input.compareLanes) : null,
       created_at: createdAt,
     })
     .executeTakeFirst();

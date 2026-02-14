@@ -1068,48 +1068,23 @@ const ExtractPage = () => {
     setError(null);
     setCompareCompleted(0);
     setCompareLanes(compareLaneOrder.map((laneId) => createLoadingLane(laneId)));
-
-    const runLane = async (laneId: ExtractionLaneId) => {
-      try {
-        const response = await api.call('extract.compareLane', { text, laneId });
-        if (!response.ok) {
-          setCompareLanes((current) =>
-            current.map((lane) =>
-              lane.laneId === laneId
-                ? {
-                    ...lane,
-                    status: 'error',
-                    durationMs: 0,
-                    errorMessage: response.error.message,
-                  }
-                : lane,
-            ),
-          );
-          return;
-        }
-
-        setCompareLanes((current) =>
-          current.map((lane) => (lane.laneId === laneId ? toLaneUi(response.data.lane) : lane)),
-        );
-      } catch (laneError) {
-        setCompareLanes((current) =>
-          current.map((lane) =>
-            lane.laneId === laneId
-              ? {
-                  ...lane,
-                  status: 'error',
-                  durationMs: 0,
-                  errorMessage: laneError instanceof Error ? laneError.message : String(laneError),
-                }
-              : lane,
-          ),
-        );
-      } finally {
-        setCompareCompleted((value) => value + 1);
+    try {
+      const response = await api.call('extract.compare', { text });
+      if (!response.ok) {
+        setError(response.error.message);
+        setCompareLanes([]);
+        return;
       }
-    };
 
-    await Promise.allSettled(compareLaneOrder.map((laneId) => runLane(laneId)));
+      const byLaneId = new Map(response.data.lanes.map((lane) => [lane.laneId, toLaneUi(lane)]));
+      setCompareLanes(
+        compareLaneOrder.map((laneId) => byLaneId.get(laneId) ?? createLoadingLane(laneId)),
+      );
+      setCompareCompleted(compareLaneOrder.length);
+    } catch (compareError) {
+      setError(compareError instanceof Error ? compareError.message : String(compareError));
+      setCompareLanes([]);
+    }
     setIsComparing(false);
     await loadHistory();
   };
@@ -1156,6 +1131,7 @@ const ExtractPage = () => {
               extraction: entry.extraction,
               extractionV2: entry.extractionV2,
               debug: entry.debug,
+              compareLanes: entry.compareLanes,
             })),
           },
           null,
@@ -1175,9 +1151,10 @@ const ExtractPage = () => {
       extractionV2: entry.extractionV2,
       debug: entry.debug,
     });
+    setCompareLanes((entry.compareLanes ?? []).map(toLaneUi));
+    setCompareCompleted(entry.compareLanes ? entry.compareLanes.length : 0);
     setViewMode('knowledge');
     setError(null);
-    setCompareLanes([]);
   };
 
   return (
@@ -1388,6 +1365,42 @@ const ExtractPage = () => {
                       {entry.prompt.length > 120 ? '...' : ''}
                     </div>
                   </button>
+                  {entry.compareLanes && entry.compareLanes.length > 0 ? (
+                    <div style={{ marginTop: 10 }}>
+                      <div
+                        data-testid={`history-compare-results-${entry.id}`}
+                        style={{ display: 'grid', gap: 8 }}
+                      >
+                        <p style={{ margin: 0, fontSize: 13, opacity: 0.8 }}>
+                          {entry.compareLanes.length}/{compareLaneOrder.length} complete
+                        </p>
+                        <div
+                          data-testid={`history-compare-lanes-${entry.id}`}
+                          style={{
+                            display: 'flex',
+                            gap: 12,
+                            overflowX: 'auto',
+                            paddingBottom: 8,
+                          }}
+                        >
+                          {compareLaneOrder.map((laneId) => {
+                            const lane = entry.compareLanes?.find((item) => item.laneId === laneId);
+                            if (!lane) {
+                              return null;
+                            }
+                            return (
+                              <CompareLaneCard
+                                key={`${entry.id}-${laneId}`}
+                                lane={toLaneUi(lane)}
+                                sourceText={entry.sourceText}
+                                viewMode="knowledge"
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                 </li>
               );
             })}

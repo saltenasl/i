@@ -59,6 +59,7 @@ describe('runtime migrations', () => {
     const applied = await runMigrations(db);
     expect(applied).toContain('0002-add-notes-title-index');
     expect(applied).toContain('0003-create-extraction-history');
+    expect(applied).toContain('0004-add-compare-lanes-to-extraction-history');
 
     const indexResult = await sql<{ name: string }>`
       PRAGMA index_list('notes')

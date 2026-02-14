@@ -22,6 +22,7 @@ export interface ExtractionHistoryEntryDto {
   extraction: Extraction;
   extractionV2: ExtractionV2;
   debug: ExtractionDebug;
+  compareLanes?: ExtractionLaneResult[];
   createdAt: string;
 }
 

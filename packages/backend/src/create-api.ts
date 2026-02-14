@@ -90,15 +90,6 @@ export const createBackendHandlers = (deps: BackendDependencies): ApiHandlers =>
 
     try {
       const lane = await (deps.runExtractionCompareLane ?? extractCompareLane)(text, input.laneId);
-      if (lane.status === 'ok' && lane.extraction && lane.extractionV2 && lane.debug) {
-        await persistExtractionHistoryService(deps.db, {
-          sourceText: text,
-          prompt: lane.debug.prompt,
-          extraction: lane.extraction,
-          extractionV2: lane.extractionV2,
-          debug: lane.debug,
-        });
-      }
       return ok({ lane });
     } catch (error) {
       return err('INTERNAL_ERROR', 'Failed to compare extraction lane.', {
@@ -113,19 +104,25 @@ export const createBackendHandlers = (deps: BackendDependencies): ApiHandlers =>
     }
 
     try {
-      const lanes = await (deps.runExtractionCompare ?? extractCompare)(text);
-      for (const lane of lanes.lanes) {
-        if (lane.status === 'ok' && lane.extraction && lane.extractionV2 && lane.debug) {
-          await persistExtractionHistoryService(deps.db, {
-            sourceText: text,
-            prompt: lane.debug.prompt,
-            extraction: lane.extraction,
-            extractionV2: lane.extractionV2,
-            debug: lane.debug,
-          });
-        }
+      const compare = await (deps.runExtractionCompare ?? extractCompare)(text);
+      const representativeLane = compare.lanes.find(
+        (lane) => lane.status === 'ok' && lane.extraction && lane.extractionV2 && lane.debug,
+      );
+      if (
+        representativeLane?.extraction &&
+        representativeLane.extractionV2 &&
+        representativeLane.debug
+      ) {
+        await persistExtractionHistoryService(deps.db, {
+          sourceText: text,
+          prompt: representativeLane.debug.prompt,
+          extraction: representativeLane.extraction,
+          extractionV2: representativeLane.extractionV2,
+          debug: representativeLane.debug,
+          compareLanes: compare.lanes,
+        });
       }
-      return ok(lanes);
+      return ok(compare);
     } catch (error) {
       return err('INTERNAL_ERROR', 'Failed to compare extraction.', {
         cause: error instanceof Error ? error.message : String(error),

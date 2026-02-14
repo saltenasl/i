@@ -7,18 +7,6 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { ApiProvider } from './ApiProvider.js';
 import { App } from './App.js';
 
-function createDeferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (error?: unknown) => void;
-
-  const promise = new Promise<T>((promiseResolve, promiseReject) => {
-    resolve = promiseResolve;
-    reject = promiseReject;
-  });
-
-  return { promise, resolve, reject };
-}
-
 describe('App (RTL with real backend implementation)', () => {
   let harness: DbHarness | undefined;
 
@@ -339,115 +327,103 @@ describe('App (RTL with real backend implementation)', () => {
     expect(screen.getByTestId('history-copy-selected-state')).toHaveTextContent('Copied');
   });
 
-  it('shows compare loading and per-lane progress transitions', async () => {
+  it('runs compare and restores persisted lane cards from history', async () => {
     if (!harness) {
       throw new Error('DB harness was not initialized.');
     }
 
-    const localDeferred = createDeferred<{
-      laneId: 'local-llama';
-      provider: 'local';
-      model: 'local-llama.cpp';
-      status: 'ok';
-      durationMs: number;
-      extraction: {
-        title: string;
-        items: [];
-        groups: [];
-      };
-      extractionV2: {
-        title: string;
-        noteType: string;
-        summary: string;
-        language: string;
-        date: null;
-        sentiment: 'neutral';
-        emotions: [];
-        entities: [];
-        facts: [];
-        relations: [];
-        groups: [];
-        segments: [];
-      };
-      debug: {
-        inputText: string;
-        prompt: string;
-        rawModelOutput: string;
-        validatedExtractionV2BeforeSegmentation: {
-          title: string;
-          noteType: string;
-          summary: string;
-          language: string;
-          date: null;
-          sentiment: 'neutral';
-          emotions: [];
-          entities: [];
-          facts: [];
-          relations: [];
-          groups: [];
-          segments: [];
-        };
-        finalExtractionV2: {
-          title: string;
-          noteType: string;
-          summary: string;
-          language: string;
-          date: null;
-          sentiment: 'neutral';
-          emotions: [];
-          entities: [];
-          facts: [];
-          relations: [];
-          groups: [];
-          segments: [];
-        };
-        finalExtractionV1: {
-          title: string;
-          items: [];
-          groups: [];
-        };
-        segmentationTrace: [];
-        runtime: {
-          modelPath: string;
-          serverMode: 'cpu';
-          nPredict: number;
-          totalMs: number;
-        };
-        fallbackUsed: false;
-        errors: [];
-      };
-    }>();
-    const anthropicDeferred = createDeferred<{
-      laneId: 'anthropic-haiku';
-      provider: 'anthropic';
-      model: 'claude-haiku-4-5-20251001';
-      status: 'skipped';
-      durationMs: number;
-      errorMessage: string;
-    }>();
-    const openaiDeferred = createDeferred<{
-      laneId: 'openai-gpt5mini';
-      provider: 'openai';
-      model: 'gpt-5-mini';
-      status: 'error';
-      durationMs: number;
-      errorMessage: string;
-    }>();
-
     const api = createApiFromHandlers(
       createBackendHandlers({
         db: harness.db,
-        runExtractionCompareLane: async (_text, laneId) => {
-          if (laneId === 'local-llama') {
-            return await localDeferred.promise;
-          }
-
-          if (laneId === 'anthropic-haiku') {
-            return await anthropicDeferred.promise;
-          }
-
-          return await openaiDeferred.promise;
-        },
+        runExtractionCompare: async (text) => ({
+          lanes: [
+            {
+              laneId: 'local-llama',
+              provider: 'local',
+              model: 'local-llama.cpp',
+              status: 'ok',
+              durationMs: 10,
+              extraction: {
+                title: 'Local',
+                items: [],
+                groups: [],
+              },
+              extractionV2: {
+                title: 'Local',
+                noteType: 'personal',
+                summary: 'Local summary',
+                language: 'en',
+                date: null,
+                sentiment: 'neutral',
+                emotions: [],
+                entities: [],
+                facts: [],
+                relations: [],
+                groups: [],
+                segments: [],
+              },
+              debug: {
+                inputText: text,
+                prompt: 'prompt',
+                rawModelOutput: '{}',
+                validatedExtractionV2BeforeSegmentation: {
+                  title: 'Local',
+                  noteType: 'personal',
+                  summary: 'Local summary',
+                  language: 'en',
+                  date: null,
+                  sentiment: 'neutral',
+                  emotions: [],
+                  entities: [],
+                  facts: [],
+                  relations: [],
+                  groups: [],
+                  segments: [],
+                },
+                finalExtractionV2: {
+                  title: 'Local',
+                  noteType: 'personal',
+                  summary: 'Local summary',
+                  language: 'en',
+                  date: null,
+                  sentiment: 'neutral',
+                  emotions: [],
+                  entities: [],
+                  facts: [],
+                  relations: [],
+                  groups: [],
+                  segments: [],
+                },
+                finalExtractionV1: { title: 'Local', items: [], groups: [] },
+                segmentationTrace: [],
+                runtime: {
+                  modelPath: 'local',
+                  serverMode: 'cpu',
+                  nPredict: 220,
+                  totalMs: 10,
+                },
+                fallbackUsed: false,
+                errors: [],
+              },
+            },
+            {
+              laneId: 'anthropic-haiku',
+              provider: 'anthropic',
+              model: 'claude-haiku-4-5-20251001',
+              status: 'skipped',
+              durationMs: 4,
+              errorMessage: 'Missing ANTHROPIC_API_KEY environment variable.',
+            },
+            {
+              laneId: 'openai-gpt5mini',
+              provider: 'openai',
+              model: 'gpt-5-mini',
+              status: 'error',
+              durationMs: 8,
+              errorMessage: 'Upstream error',
+            },
+          ],
+        }),
       }),
     );
 
@@ -462,113 +438,34 @@ describe('App (RTL with real backend implementation)', () => {
     await user.click(screen.getByTestId('extract-compare-button'));
 
     expect(await screen.findByTestId('compare-results')).toBeInTheDocument();
-    expect(screen.getByTestId('extract-submit-button')).toBeDisabled();
-    expect(screen.getByTestId('extract-compare-button')).toBeDisabled();
-    expect(screen.getByTestId('compare-progress')).toHaveTextContent('0/3 complete');
-    expect(screen.getByTestId('compare-lane-loading-local-llama')).toBeInTheDocument();
+    expect(screen.getByTestId('compare-progress')).toHaveTextContent('3/3 complete');
     expect(screen.getByTestId('compare-lanes-scroll')).toBeInTheDocument();
-
-    localDeferred.resolve({
-      laneId: 'local-llama',
-      provider: 'local',
-      model: 'local-llama.cpp',
-      status: 'ok',
-      durationMs: 10,
-      extraction: {
-        title: 'Local',
-        items: [],
-        groups: [],
-      },
-      extractionV2: {
-        title: 'Local',
-        noteType: 'personal',
-        summary: 'Local summary',
-        language: 'en',
-        date: null,
-        sentiment: 'neutral',
-        emotions: [],
-        entities: [],
-        facts: [],
-        relations: [],
-        groups: [],
-        segments: [],
-      },
-      debug: {
-        inputText: 'Compare this note',
-        prompt: 'prompt',
-        rawModelOutput: '{}',
-        validatedExtractionV2BeforeSegmentation: {
-          title: 'Local',
-          noteType: 'personal',
-          summary: 'Local summary',
-          language: 'en',
-          date: null,
-          sentiment: 'neutral',
-          emotions: [],
-          entities: [],
-          facts: [],
-          relations: [],
-          groups: [],
-          segments: [],
-        },
-        finalExtractionV2: {
-          title: 'Local',
-          noteType: 'personal',
-          summary: 'Local summary',
-          language: 'en',
-          date: null,
-          sentiment: 'neutral',
-          emotions: [],
-          entities: [],
-          facts: [],
-          relations: [],
-          groups: [],
-          segments: [],
-        },
-        finalExtractionV1: { title: 'Local', items: [], groups: [] },
-        segmentationTrace: [],
-        runtime: {
-          modelPath: 'local',
-          serverMode: 'cpu',
-          nPredict: 220,
-          totalMs: 10,
-        },
-        fallbackUsed: false,
-        errors: [],
-      },
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId('compare-progress')).toHaveTextContent('1/3 complete');
-      expect(screen.getByTestId('compare-lane-status-local-llama')).toHaveTextContent('ok');
-    });
-
-    anthropicDeferred.resolve({
-      laneId: 'anthropic-haiku',
-      provider: 'anthropic',
-      model: 'claude-haiku-4-5-20251001',
-      status: 'skipped',
-      durationMs: 4,
-      errorMessage: 'Missing ANTHROPIC_API_KEY environment variable.',
-    });
-    openaiDeferred.resolve({
-      laneId: 'openai-gpt5mini',
-      provider: 'openai',
-      model: 'gpt-5-mini',
-      status: 'error',
-      durationMs: 8,
-      errorMessage: 'Upstream error',
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId('compare-progress')).toHaveTextContent('3/3 complete');
-      expect(screen.getByTestId('compare-lane-status-anthropic-haiku')).toHaveTextContent(
-        'skipped',
-      );
-      expect(screen.getByTestId('compare-lane-status-openai-gpt5mini')).toHaveTextContent('error');
-    });
-
-    expect(screen.getByTestId('compare-lane-vertical-local-llama')).toBeInTheDocument();
+    expect(screen.getAllByTestId('compare-lane-status-local-llama')[0]).toHaveTextContent('ok');
+    expect(screen.getAllByTestId('compare-lane-status-anthropic-haiku')[0]).toHaveTextContent(
+      'skipped',
+    );
+    expect(screen.getAllByTestId('compare-lane-status-openai-gpt5mini')[0]).toHaveTextContent(
+      'error',
+    );
+    expect(screen.getAllByTestId('compare-lane-vertical-local-llama')[0]).toBeInTheDocument();
     expect(screen.getByTestId('extract-compare-button')).toHaveTextContent('Run A/B Compare');
+
+    const historyList = await screen.findByTestId('extraction-history-list');
+    const openButtons = historyList.querySelectorAll('[data-testid^="history-open-"]');
+    const firstOpenButton = openButtons[0];
+    expect(firstOpenButton).toBeDefined();
+    if (!firstOpenButton) {
+      throw new Error('Expected at least one history open button.');
+    }
+    await user.click(firstOpenButton);
+
+    const historyCompareSections = historyList.querySelectorAll(
+      '[data-testid^="history-compare-results-"]',
+    );
+    expect(historyCompareSections.length).toBeGreaterThan(0);
+    const historyCompareLanes = historyList.querySelectorAll(
+      '[data-testid^="history-compare-lanes-"]',
+    );
+    expect(historyCompareLanes.length).toBeGreaterThan(0);
   });
 });
