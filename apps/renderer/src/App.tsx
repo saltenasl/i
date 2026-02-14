@@ -475,6 +475,32 @@ type CompareLaneUi = {
   errorMessage?: string;
 };
 
+const LANE_ERROR_PREVIEW_MAX_CHARS = 320;
+
+const splitLaneErrorMessage = (
+  errorMessage: string | undefined,
+): { preview: string; details?: string } => {
+  const normalized = (errorMessage ?? 'No details.').trim();
+  const rawOutputIndex = normalized.indexOf('Raw output:');
+  if (rawOutputIndex >= 0) {
+    const preview = normalized.slice(0, rawOutputIndex).trim();
+    const details = normalized.slice(rawOutputIndex).trim();
+    return {
+      preview: preview.length > 0 ? preview : 'Model output was not valid JSON.',
+      ...(details.length > 0 ? { details } : {}),
+    };
+  }
+
+  if (normalized.length <= LANE_ERROR_PREVIEW_MAX_CHARS) {
+    return { preview: normalized };
+  }
+
+  return {
+    preview: `${normalized.slice(0, LANE_ERROR_PREVIEW_MAX_CHARS).trimEnd()}...`,
+    details: normalized,
+  };
+};
+
 const createLoadingLane = (laneId: ExtractionLaneId): CompareLaneUi => {
   const lane = compareLaneMeta[laneId];
   return {
@@ -509,18 +535,25 @@ const CompareLaneCard = ({
   sourceText: string;
 }) => {
   const laneLabel = compareLaneMeta[lane.laneId];
+  const laneExtraction = lane.status === 'ok' ? lane.extractionV2 : undefined;
+  const laneError =
+    lane.status === 'error' || lane.status === 'skipped'
+      ? splitLaneErrorMessage(lane.errorMessage)
+      : undefined;
 
   return (
     <article
       data-testid={`compare-lane-${lane.laneId}`}
       style={{
         position: 'relative',
-        minWidth: 360,
-        maxWidth: 520,
+        minWidth: 0,
+        width: '100%',
+        boxSizing: 'border-box',
         padding: '14px 14px 14px 42px',
         border: '1px dotted #9aa4b2',
         borderRadius: 10,
         background: '#fff',
+        overflow: 'hidden',
       }}
     >
       <span
@@ -579,18 +612,78 @@ const CompareLaneCard = ({
       ) : null}
 
       {lane.status === 'error' || lane.status === 'skipped' ? (
-        <p data-testid={`compare-lane-message-${lane.laneId}`} style={{ margin: 0, fontSize: 13 }}>
-          {lane.errorMessage ?? 'No details.'}
-        </p>
+        <div style={{ display: 'grid', gap: 8 }}>
+          <p
+            data-testid={`compare-lane-message-${lane.laneId}`}
+            style={{ margin: 0, fontSize: 13, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
+          >
+            {laneError?.preview}
+          </p>
+          {laneError?.details ? (
+            <details>
+              <summary>Show Full Error</summary>
+              <pre
+                data-testid={`compare-lane-message-full-${lane.laneId}`}
+                style={{
+                  marginTop: 8,
+                  maxHeight: 220,
+                  overflow: 'auto',
+                  whiteSpace: 'pre-wrap',
+                  overflowWrap: 'anywhere',
+                  border: '1px solid #d0d7de',
+                  borderRadius: 8,
+                  padding: 8,
+                }}
+              >
+                {laneError.details}
+              </pre>
+            </details>
+          ) : null}
+        </div>
       ) : null}
 
       {lane.status === 'ok' && lane.extraction && lane.extractionV2 && lane.debug ? (
-        <ExtractionContractView
-          extraction={lane.extraction}
-          extractionV2={lane.extractionV2}
-          sourceText={sourceText}
-          debug={lane.debug}
-        />
+        <div
+          data-testid={`compare-lane-success-${lane.laneId}`}
+          style={{ display: 'grid', gap: 10 }}
+        >
+          <div style={{ fontSize: 13, display: 'grid', gap: 4 }}>
+            <div>
+              <strong>Title:</strong> {laneExtraction?.title}
+            </div>
+            <div>
+              <strong>Sentiment:</strong> {laneExtraction?.sentiment}
+            </div>
+            <div>
+              <strong>Entities:</strong> {laneExtraction?.entities.length ?? 0} |{' '}
+              <strong>Facts:</strong> {laneExtraction?.facts.length ?? 0} |{' '}
+              <strong>Relations:</strong> {laneExtraction?.relations.length ?? 0}
+            </div>
+            <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+              <strong>Summary:</strong> {laneExtraction?.summary}
+            </div>
+          </div>
+          <details>
+            <summary>Open Full Extraction</summary>
+            <div
+              style={{
+                marginTop: 8,
+                maxHeight: 520,
+                overflow: 'auto',
+                border: '1px solid #d0d7de',
+                borderRadius: 8,
+                padding: 8,
+              }}
+            >
+              <ExtractionContractView
+                extraction={lane.extraction}
+                extractionV2={lane.extractionV2}
+                sourceText={sourceText}
+                debug={lane.debug}
+              />
+            </div>
+          </details>
+        </div>
       ) : null}
     </article>
   );
@@ -836,10 +929,11 @@ const ExtractPage = () => {
           <div
             data-testid="compare-lanes-scroll"
             style={{
-              display: 'flex',
+              display: 'grid',
+              width: '100%',
               gap: 12,
-              overflowX: 'auto',
-              paddingBottom: 8,
+              alignItems: 'start',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
             }}
           >
             {compareLaneOrder.map((laneId) => {
@@ -942,10 +1036,11 @@ const ExtractPage = () => {
                         <div
                           data-testid={`history-compare-lanes-${entry.id}`}
                           style={{
-                            display: 'flex',
+                            display: 'grid',
+                            width: '100%',
                             gap: 12,
-                            overflowX: 'auto',
-                            paddingBottom: 8,
+                            alignItems: 'start',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
                           }}
                         >
                           {compareLaneOrder.map((laneId) => {

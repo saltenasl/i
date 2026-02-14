@@ -406,7 +406,8 @@ describe('App (RTL with real backend implementation)', () => {
               model: 'gpt-5-mini',
               status: 'error',
               durationMs: 8,
-              errorMessage: 'Upstream error',
+              errorMessage:
+                'Model output is not valid JSON: Unexpected end of JSON input. Raw output: The road is closed. The road is closed. The road is closed.',
             },
           ],
         }),
@@ -425,7 +426,9 @@ describe('App (RTL with real backend implementation)', () => {
 
     expect(await screen.findByTestId('compare-results')).toBeInTheDocument();
     expect(screen.getByTestId('compare-progress')).toHaveTextContent('3/3 complete');
-    expect(screen.getByTestId('compare-lanes-scroll')).toBeInTheDocument();
+    const compareLanes = screen.getByTestId('compare-lanes-scroll');
+    expect(compareLanes).toBeInTheDocument();
+    expect(compareLanes).toHaveStyle({ display: 'grid' });
     expect(screen.getAllByTestId('compare-lane-status-local-llama')[0]).toHaveTextContent('ok');
     expect(screen.getAllByTestId('compare-lane-status-anthropic-haiku')[0]).toHaveTextContent(
       'skipped',
@@ -433,6 +436,12 @@ describe('App (RTL with real backend implementation)', () => {
     expect(screen.getAllByTestId('compare-lane-status-openai-gpt5mini')[0]).toHaveTextContent(
       'error',
     );
+    expect(screen.getAllByTestId('compare-lane-message-openai-gpt5mini')[0]).toHaveTextContent(
+      'Model output is not valid JSON',
+    );
+    expect(
+      screen.getAllByTestId('compare-lane-message-full-openai-gpt5mini')[0],
+    ).toBeInTheDocument();
     expect(screen.getAllByTestId('compare-lane-vertical-local-llama')[0]).toBeInTheDocument();
     expect(screen.getByTestId('extract-compare-button')).toHaveTextContent('Run A/B Compare');
 
