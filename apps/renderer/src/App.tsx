@@ -163,6 +163,10 @@ const buildSourceChunks = (
     .map((entity) => ({ id: entity.id, start: entity.nameStart, end: entity.nameEnd }))
     .filter((span) => span.start >= 0 && span.end > span.start && span.end <= text.length);
 
+  const activeEntity = extractionV2.entities.find((entity) => entity.id === activeEntityId);
+  const activeEntityName = activeEntity?.name.trim().toLowerCase() ?? '';
+  const lowerText = text.toLowerCase();
+
   const involvementSpans =
     activeEntityId === null
       ? []
@@ -174,7 +178,39 @@ const buildSourceChunks = (
                 fact.subjectEntityId === activeEntityId ||
                 fact.objectEntityId === activeEntityId,
             )
-            .map((fact) => ({ start: fact.evidenceStart, end: fact.evidenceEnd })),
+            .flatMap((fact) => {
+              const evidence = text.slice(fact.evidenceStart, fact.evidenceEnd).toLowerCase();
+              if (activeEntityName && evidence.includes(activeEntityName)) {
+                return [{ start: fact.evidenceStart, end: fact.evidenceEnd }];
+              }
+              if (!activeEntityName) {
+                return [{ start: fact.evidenceStart, end: fact.evidenceEnd }];
+              }
+
+              const nearest = (() => {
+                let from = 0;
+                let bestStart = -1;
+                let bestDistance = Number.POSITIVE_INFINITY;
+                while (from <= text.length) {
+                  const at = lowerText.indexOf(activeEntityName, from);
+                  if (at < 0) {
+                    break;
+                  }
+                  const distance = Math.abs(at - fact.evidenceStart);
+                  if (distance < bestDistance) {
+                    bestStart = at;
+                    bestDistance = distance;
+                  }
+                  from = at + activeEntityName.length;
+                }
+                if (bestStart < 0) {
+                  return null;
+                }
+                return { start: bestStart, end: bestStart + activeEntityName.length };
+              })();
+
+              return nearest ? [nearest] : [];
+            }),
           ...extractionV2.relations
             .filter(
               (relation) =>
@@ -244,6 +280,72 @@ const formatPredicate = (value: string): string => {
     .replace(/[_-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+};
+
+const getSafeEntityExcerptSpan = (
+  entity: ExtractionV2['entities'][number],
+): { start: number; end: number } => {
+  return { start: entity.nameStart, end: entity.nameEnd };
+};
+
+const buildSummaryChunks = (
+  summary: string,
+  entities: ExtractionV2['entities'],
+): Array<{ key: string; text: string; entityId: string | null }> => {
+  const matches: Array<{ entityId: string; start: number; end: number }> = [];
+  const lowerSummary = summary.toLowerCase();
+
+  for (const entity of entities) {
+    const needle = entity.name.trim().toLowerCase();
+    if (!needle) {
+      continue;
+    }
+
+    let from = 0;
+    while (from < lowerSummary.length) {
+      const at = lowerSummary.indexOf(needle, from);
+      if (at < 0) {
+        break;
+      }
+      matches.push({ entityId: entity.id, start: at, end: at + needle.length });
+      from = at + needle.length;
+    }
+  }
+
+  matches.sort((a, b) => a.start - b.start);
+
+  const chunks: Array<{ key: string; text: string; entityId: string | null }> = [];
+  let cursor = 0;
+  let plainIndex = 0;
+  for (const match of matches) {
+    if (match.start < cursor) {
+      continue;
+    }
+    if (match.start > cursor) {
+      chunks.push({
+        key: `summary-plain-${plainIndex}-${cursor}-${match.start}`,
+        text: summary.slice(cursor, match.start),
+        entityId: null,
+      });
+      plainIndex += 1;
+    }
+    chunks.push({
+      key: `summary-entity-${match.entityId}-${match.start}-${match.end}`,
+      text: summary.slice(match.start, match.end),
+      entityId: match.entityId,
+    });
+    cursor = match.end;
+  }
+
+  if (cursor < summary.length) {
+    chunks.push({
+      key: `summary-plain-${plainIndex}-${cursor}-${summary.length}`,
+      text: summary.slice(cursor),
+      entityId: null,
+    });
+  }
+
+  return chunks;
 };
 
 const ExtractionView = ({
@@ -329,6 +431,10 @@ const KnowledgeExtractionView = ({
   const highlightedChunks = useMemo(() => {
     return buildSourceChunks(sourceText, extractionV2, activeEntityId);
   }, [sourceText, extractionV2, activeEntityId]);
+  const summaryChunks = useMemo(
+    () => buildSummaryChunks(extractionV2.summary, extractionV2.entities),
+    [extractionV2.summary, extractionV2.entities],
+  );
 
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
 
@@ -363,7 +469,31 @@ const KnowledgeExtractionView = ({
     <section data-testid="extraction-v2-result" style={{ display: 'grid', gap: 14 }}>
       <div>
         <h3 style={{ marginBottom: 4 }}>Knowledge Summary</h3>
-        <p style={{ margin: 0 }}>{extractionV2.summary}</p>
+        <p style={{ margin: 0 }}>
+          {summaryChunks.map((chunk) => {
+            if (!chunk.entityId) {
+              return <span key={chunk.key}>{chunk.text}</span>;
+            }
+
+            const color = colorByEntityId.get(chunk.entityId) ?? '#fff3bf';
+            return (
+              <span
+                key={chunk.key}
+                data-testid={`summary-entity-${chunk.entityId}`}
+                onMouseEnter={() => setActiveEntityId(chunk.entityId)}
+                onMouseLeave={() => setActiveEntityId(null)}
+                style={{
+                  background: color,
+                  borderRadius: 4,
+                  padding: '1px 2px',
+                  cursor: 'pointer',
+                }}
+              >
+                {chunk.text}
+              </span>
+            );
+          })}
+        </p>
         <p style={{ margin: '6px 0 0', opacity: 0.8, fontSize: 13 }}>
           Type: {extractionV2.noteType} | Language: {extractionV2.language} | Sentiment:{' '}
           {extractionV2.sentiment}
@@ -445,8 +575,7 @@ const KnowledgeExtractionView = ({
         <h3 style={{ marginBottom: 6 }}>Entities</h3>
         <ul data-testid="extraction-v2-entities" style={{ margin: 0, paddingLeft: 18 }}>
           {extractionV2.entities.map((entity, index) => {
-            const excerptStart = entity.evidenceStart ?? entity.nameStart;
-            const excerptEnd = entity.evidenceEnd ?? entity.nameEnd;
+            const excerptSpan = getSafeEntityExcerptSpan(entity);
             const isActive = activeEntityId === entity.id;
             return (
               <li
@@ -475,7 +604,7 @@ const KnowledgeExtractionView = ({
                 <strong>{entity.name}</strong> ({entity.type}) [{entity.nameStart}-{entity.nameEnd}]
                 -{' '}
                 <span data-testid={`entity-excerpt-${entity.id}`}>
-                  {getExcerpt(sourceText, excerptStart, excerptEnd)}
+                  {getExcerpt(sourceText, excerptSpan.start, excerptSpan.end)}
                 </span>
               </li>
             );
@@ -505,10 +634,15 @@ const KnowledgeExtractionView = ({
                 key={fact.id}
                 data-testid={`fact-row-${fact.id}`}
                 data-involved={involved ? 'true' : 'false'}
+                onMouseEnter={() =>
+                  setActiveEntityId(fact.subjectEntityId ?? fact.ownerEntityId ?? null)
+                }
+                onMouseLeave={() => setActiveEntityId(null)}
                 style={{
                   background: involved ? '#fff4e6' : undefined,
                   borderLeft: involved ? '3px solid #f08c00' : undefined,
                   paddingLeft: involved ? 6 : undefined,
+                  cursor: 'pointer',
                 }}
               >
                 owner=<strong>{owner}</strong> perspective=<strong>{fact.perspective}</strong> |{' '}
@@ -524,7 +658,12 @@ const KnowledgeExtractionView = ({
         <h3 style={{ marginBottom: 6 }}>Relations</h3>
         <ul data-testid="extraction-v2-relations" style={{ margin: 0, paddingLeft: 18 }}>
           {extractionV2.relations.map((relation, index) => (
-            <li key={`${relation.fromEntityId}-${relation.toEntityId}-${relation.type}-${index}`}>
+            <li
+              key={`${relation.fromEntityId}-${relation.toEntityId}-${relation.type}-${index}`}
+              onMouseEnter={() => setActiveEntityId(relation.fromEntityId)}
+              onMouseLeave={() => setActiveEntityId(null)}
+              style={{ cursor: 'pointer' }}
+            >
               {relation.fromEntityId} → {relation.toEntityId} ({relation.type})
             </li>
           ))}
@@ -548,7 +687,12 @@ const KnowledgeExtractionView = ({
         <h3 style={{ marginBottom: 6 }}>Groups</h3>
         <ul data-testid="extraction-v2-groups" style={{ margin: 0, paddingLeft: 18 }}>
           {extractionV2.groups.map((group) => (
-            <li key={group.name}>
+            <li
+              key={group.name}
+              onMouseEnter={() => setActiveEntityId(group.entityIds[0] ?? null)}
+              onMouseLeave={() => setActiveEntityId(null)}
+              style={{ cursor: group.entityIds.length > 0 ? 'pointer' : 'default' }}
+            >
               <strong>{group.name}</strong> - entities: {group.entityIds.length}, facts:{' '}
               {group.factIds.length}
             </li>

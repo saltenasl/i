@@ -304,6 +304,10 @@ describe('App (RTL with real backend implementation)', () => {
     expect(screen.getByTestId('fact-row-fact_call')).toHaveAttribute('data-involved', 'false');
     expect(screen.getByTestId('fact-row-fact_scared')).toHaveAttribute('data-involved', 'false');
 
+    await user.hover(screen.getByTestId('summary-entity-ent_egle'));
+    expect(screen.getByTestId('fact-row-fact_scared')).toHaveAttribute('data-involved', 'true');
+    await user.unhover(screen.getByTestId('summary-entity-ent_egle'));
+
     await user.hover(screen.getByTestId('entity-row-ent_egle'));
     expect(screen.getByTestId('fact-row-fact_call')).toHaveAttribute('data-involved', 'false');
     expect(screen.getByTestId('fact-row-fact_scared')).toHaveAttribute('data-involved', 'true');
