@@ -85,13 +85,18 @@
 - Auto-extract test convention: tests must not call real `@repo/auto-extract` inference by default; any temporary unmocking requires explicit per-task user permission and an in-file override marker documented with rationale, due cost and runtime volatility.
 - Extraction pipeline convention: run one whole-note LLM extraction pass first (global-context), then deterministically derive segments from grounded spans; do not pre-split into multiple LLM calls by default.
 - Attribution convention: every fact must carry `ownerEntityId` and `perspective` (`self`/`other`/`uncertain`) to avoid conflating narrator facts with other entities.
+- Narrator-first convention: in first-person notes, narrator (`I`) is the default owner for first-person evidence; explicit third-party evidence remains `other`.
+- Pronoun convention: `we` implies narrator involvement and should map to narrator ownership/perspective unless explicitly excluded.
 - Sentiment convention: use per-segment sentiment as primary query surface; top-level sentiment is a rollup and uses `varied` when segments differ.
+- Fact language convention: predicates should be concise natural language (spaces), not snake_case, for cross-model consistency and UI readability.
 - UI convention: extraction page must show original source text with color-matched entity highlights and excerpt snippets in the entity list.
 - Debugging convention: extraction UI must provide a one-click debug export containing prompt, raw model output, validated/final payloads, segmentation trace, runtime metadata, and fallback/error info.
 - E2E extraction convention: keep E2E assertions at smoke level for extraction UI controls (textarea + submit, fresh + seeded profiles), not model-inference content assertions.
 - Runtime constraint convention: extraction must use local llama.cpp + local GGUF only (no Python), with first-call auto-download into `~/.auto-extract`.
 - Latency target convention: optimize extraction for practical local responsiveness with a working target around <=2s on supported hardware/model, while prioritizing correctness and grounding over unrealistic token-speed assumptions.
 - A/B benchmarking convention: extraction compare mode may call cloud providers via AI SDK (Anthropic + OpenAI) in parallel with local llama for side-by-side evaluation, while preserving the existing local-only `extract.run` path for compatibility.
+- Task extraction convention: detect TODO/task intent from note text and represent it as self-owned grounded facts when present.
+- Segmentation convention: segments are additive debug metadata only; facts are the primary structured surface and must remain complete without segment reliance.
 
 ## Convention Intake Process
 When a new user convention appears:

@@ -205,6 +205,14 @@ const getExcerpt = (text: string, start: number, end: number): string => {
   return text.slice(left, right).replace(/\s+/g, ' ').trim();
 };
 
+const formatPredicate = (value: string): string => {
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
 const ExtractionView = ({
   extraction,
   sourceText,
@@ -420,9 +428,8 @@ const KnowledgeExtractionView = ({
             return (
               <li key={fact.id}>
                 owner=<strong>{owner}</strong> perspective=<strong>{fact.perspective}</strong> |{' '}
-                {subject} → <strong>{fact.predicate}</strong> → {object} [{fact.evidenceStart}-
-                {fact.evidenceEnd}] seg:
-                {fact.segmentId ?? '-'}
+                {subject} → <strong>{formatPredicate(fact.predicate)}</strong> → {object} [
+                {fact.evidenceStart}-{fact.evidenceEnd}]
               </li>
             );
           })}

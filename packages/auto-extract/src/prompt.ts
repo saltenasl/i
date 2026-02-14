@@ -12,8 +12,13 @@ export const buildSystemPromptV2 = (): string => {
     '- Keep IDs short and stable within this response (e.g. ent_1, fact_1).',
     '- Facts/relations should reference entity IDs when possible.',
     '- Every fact must include ownerEntityId and perspective.',
+    '- Use concise natural-language predicates (example: "called road maintenance"), not snake_case tokens.',
+    '- If first-person pronouns appear (I/me/my/we/us/our), include narrator as a person entity and treat first-person facts as perspective=self.',
+    '- "we" includes the narrator; do not map "we" facts to only another person.',
+    '- Capture TODO/task intent as facts when present (e.g., need to, should, must, todo, remember to).',
     "- Do not assign another person's emotional state to narrator unless explicitly stated.",
     '- Actions/emotions should be represented in fact evidence spans, not inside entity names.',
+    '- Summary must synthesize, not restate line-by-line; keep it to 1-2 concise sentences.',
     '- Use concise values.',
     '- title must be <= 25 characters.',
   ].join('\n');

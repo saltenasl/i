@@ -59,6 +59,17 @@ const parseOptionalString = (value: unknown, label: string): string | undefined 
   return parseString(value, label);
 };
 
+const normalizePredicate = (predicate: string): string => {
+  const normalized = predicate
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+  return normalized || predicate.trim();
+};
+
 const parseJsonObjectFromOutput = (rawOutput: string): unknown => {
   const trimmed = rawOutput.trim();
 
@@ -647,7 +658,9 @@ export const validateExtractionV2 = (text: string, raw: unknown): ExtractionV2 =
     }
 
     const id = parseString(factRaw.id, `facts[${index}].id`);
-    const predicate = parseString(factRaw.predicate, `facts[${index}].predicate`);
+    const predicate = normalizePredicate(
+      parseString(factRaw.predicate, `facts[${index}].predicate`),
+    );
     const evidenceStart = parseNumber(factRaw.evidenceStart, `facts[${index}].evidenceStart`);
     const evidenceEnd = parseNumber(factRaw.evidenceEnd, `facts[${index}].evidenceEnd`);
     const confidence = parseNumber(factRaw.confidence, `facts[${index}].confidence`);
@@ -659,6 +672,10 @@ export const validateExtractionV2 = (text: string, raw: unknown): ExtractionV2 =
       evidenceEnd <= evidenceStart ||
       evidenceEnd > text.length
     ) {
+      return [];
+    }
+
+    if (!predicate) {
       return [];
     }
 
