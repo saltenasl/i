@@ -291,6 +291,20 @@ describe('App (RTL with real backend implementation)', () => {
     expect(screen.getByTestId('entity-excerpt-ent_egle')).toHaveTextContent('driving');
     expect(screen.getByTestId('fact-row-fact_scared')).toHaveTextContent('other');
     expect(screen.getByTestId('fact-row-fact_scared')).toHaveTextContent('ent_egle (Egle)');
+    const sourceEgleHighlights = screen.getAllByTestId('source-entity-ent_egle');
+    const firstSourceEgleHighlight = sourceEgleHighlights[0];
+    expect(firstSourceEgleHighlight).toBeDefined();
+    if (!firstSourceEgleHighlight) {
+      throw new Error('Expected at least one source highlight for ent_egle.');
+    }
+    expect(firstSourceEgleHighlight).toHaveAttribute('data-active', 'false');
+    expect(screen.getByTestId('entity-row-ent_egle')).toHaveAttribute('data-active', 'false');
+    await user.hover(screen.getByTestId('fact-row-fact_scared'));
+    expect(screen.getByTestId('fact-row-fact_scared')).toHaveAttribute('data-active', 'true');
+    expect(screen.getByTestId('entity-row-ent_egle')).toHaveAttribute('data-active', 'true');
+    expect(firstSourceEgleHighlight).toHaveAttribute('data-active', 'true');
+    await user.unhover(screen.getByTestId('fact-row-fact_scared'));
+    expect(firstSourceEgleHighlight).toHaveAttribute('data-active', 'false');
     expect(screen.getByTestId('extraction-v2-groups')).toHaveTextContent('people');
     expect(screen.getByTestId('extraction-v1-json')).toHaveTextContent('Winter Drive');
 

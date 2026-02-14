@@ -156,6 +156,98 @@ const formatOptionalSpan = (start: number | undefined, end: number | undefined):
   return `${start}-${end}`;
 };
 
+type EntitySwatch = {
+  fill: string;
+  accent: string;
+};
+
+type SourceToken = {
+  start: number;
+  text: string;
+  entityId?: string;
+};
+
+type HoverTarget =
+  | { kind: 'entity'; entityId: string }
+  | { kind: 'fact'; factId: string }
+  | { kind: 'relation'; relationIndex: number }
+  | { kind: 'group'; groupName: string }
+  | null;
+
+type ActiveHighlights = {
+  entityIds: Set<string>;
+  factIds: Set<string>;
+  relationIndexes: Set<number>;
+  groupNames: Set<string>;
+};
+
+const ENTITY_SWATCHES: EntitySwatch[] = [
+  { fill: '#f8e7ba', accent: '#d97706' },
+  { fill: '#d9efdd', accent: '#2f9e44' },
+  { fill: '#dceaf8', accent: '#1971c2' },
+  { fill: '#f8dcc7', accent: '#c2410c' },
+  { fill: '#f0ddf8', accent: '#7c3aed' },
+  { fill: '#f7d8e7', accent: '#c2255c' },
+  { fill: '#d9f2ef', accent: '#0f766e' },
+  { fill: '#f9e2cf', accent: '#b45309' },
+];
+
+const DEFAULT_SWATCH: EntitySwatch = {
+  fill: '#e9ecef',
+  accent: '#6c757d',
+};
+
+const buildSourceTokens = (
+  sourceText: string,
+  entities: ExtractionV2['entities'],
+): SourceToken[] => {
+  const validEntities = entities
+    .filter((entity) => entity.nameStart >= 0 && entity.nameEnd > entity.nameStart)
+    .map((entity) => ({
+      entityId: entity.id,
+      start: Math.max(0, Math.min(sourceText.length, entity.nameStart)),
+      end: Math.max(0, Math.min(sourceText.length, entity.nameEnd)),
+    }))
+    .filter((entity) => entity.end > entity.start)
+    .sort((a, b) => a.start - b.start || a.end - b.end);
+
+  const tokens: SourceToken[] = [];
+  let cursor = 0;
+
+  for (const entity of validEntities) {
+    if (entity.start < cursor) {
+      continue;
+    }
+    if (cursor < entity.start) {
+      tokens.push({ start: cursor, text: sourceText.slice(cursor, entity.start) });
+    }
+    tokens.push({
+      start: entity.start,
+      text: sourceText.slice(entity.start, entity.end),
+      entityId: entity.entityId,
+    });
+    cursor = entity.end;
+  }
+
+  if (cursor < sourceText.length) {
+    tokens.push({ start: cursor, text: sourceText.slice(cursor) });
+  }
+
+  if (tokens.length === 0) {
+    return [{ start: 0, text: sourceText }];
+  }
+
+  return tokens;
+};
+
+const factTouchesEntity = (fact: ExtractionV2['facts'][number], entityId: string): boolean => {
+  return (
+    fact.ownerEntityId === entityId ||
+    fact.subjectEntityId === entityId ||
+    fact.objectEntityId === entityId
+  );
+};
+
 const ExtractionContractView = ({
   extraction,
   extractionV2,
@@ -170,8 +262,32 @@ const ExtractionContractView = ({
   const entityById = useMemo(() => {
     return new Map(extractionV2.entities.map((entity) => [entity.id, entity]));
   }, [extractionV2.entities]);
+  const factById = useMemo(() => {
+    return new Map(extractionV2.facts.map((fact) => [fact.id, fact]));
+  }, [extractionV2.facts]);
+  const groupByName = useMemo(() => {
+    return new Map(extractionV2.groups.map((group) => [group.name, group]));
+  }, [extractionV2.groups]);
+  const entitySwatchById = useMemo(() => {
+    const swatchMap = new Map<string, EntitySwatch>();
+    for (const [index, entity] of extractionV2.entities.entries()) {
+      swatchMap.set(entity.id, ENTITY_SWATCHES[index % ENTITY_SWATCHES.length] ?? DEFAULT_SWATCH);
+    }
+    return swatchMap;
+  }, [extractionV2.entities]);
+  const sourceTokens = useMemo(() => {
+    return buildSourceTokens(sourceText, extractionV2.entities);
+  }, [sourceText, extractionV2.entities]);
 
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+  const [hoverTarget, setHoverTarget] = useState<HoverTarget>(null);
+
+  const getEntitySwatch = (entityId: string | undefined): EntitySwatch => {
+    if (!entityId) {
+      return DEFAULT_SWATCH;
+    }
+    return entitySwatchById.get(entityId) ?? DEFAULT_SWATCH;
+  };
 
   const getEntityLabel = (entityId: string | undefined): string => {
     if (!entityId) {
@@ -183,6 +299,123 @@ const ExtractionContractView = ({
     }
     return `${entityId} (${entity.name})`;
   };
+
+  const active = useMemo<ActiveHighlights>(() => {
+    const entityIds = new Set<string>();
+    const factIds = new Set<string>();
+    const relationIndexes = new Set<number>();
+    const groupNames = new Set<string>();
+
+    const addEntity = (entityId: string | undefined) => {
+      if (!entityId) {
+        return;
+      }
+      entityIds.add(entityId);
+    };
+
+    const addFact = (fact: ExtractionV2['facts'][number] | undefined) => {
+      if (!fact) {
+        return;
+      }
+      factIds.add(fact.id);
+      addEntity(fact.ownerEntityId);
+      addEntity(fact.subjectEntityId);
+      addEntity(fact.objectEntityId);
+    };
+
+    const includeGroupsForCurrentSelection = () => {
+      for (const group of extractionV2.groups) {
+        const touchesEntity = group.entityIds.some((entityId) => entityIds.has(entityId));
+        const touchesFact = group.factIds.some((factId) => factIds.has(factId));
+        if (!touchesEntity && !touchesFact) {
+          continue;
+        }
+        groupNames.add(group.name);
+      }
+    };
+
+    switch (hoverTarget?.kind) {
+      case 'entity': {
+        addEntity(hoverTarget.entityId);
+        for (const fact of extractionV2.facts) {
+          if (factTouchesEntity(fact, hoverTarget.entityId)) {
+            addFact(fact);
+          }
+        }
+        for (const [relationIndex, relation] of extractionV2.relations.entries()) {
+          if (
+            relation.fromEntityId === hoverTarget.entityId ||
+            relation.toEntityId === hoverTarget.entityId
+          ) {
+            relationIndexes.add(relationIndex);
+            addEntity(relation.fromEntityId);
+            addEntity(relation.toEntityId);
+          }
+        }
+        includeGroupsForCurrentSelection();
+        break;
+      }
+      case 'fact': {
+        addFact(factById.get(hoverTarget.factId));
+        for (const [relationIndex, relation] of extractionV2.relations.entries()) {
+          if (entityIds.has(relation.fromEntityId) || entityIds.has(relation.toEntityId)) {
+            relationIndexes.add(relationIndex);
+            addEntity(relation.fromEntityId);
+            addEntity(relation.toEntityId);
+          }
+        }
+        includeGroupsForCurrentSelection();
+        break;
+      }
+      case 'relation': {
+        const relation = extractionV2.relations[hoverTarget.relationIndex];
+        if (relation) {
+          relationIndexes.add(hoverTarget.relationIndex);
+          addEntity(relation.fromEntityId);
+          addEntity(relation.toEntityId);
+          for (const fact of extractionV2.facts) {
+            if (
+              factTouchesEntity(fact, relation.fromEntityId) ||
+              factTouchesEntity(fact, relation.toEntityId)
+            ) {
+              addFact(fact);
+            }
+          }
+          includeGroupsForCurrentSelection();
+        }
+        break;
+      }
+      case 'group': {
+        const group = groupByName.get(hoverTarget.groupName);
+        if (group) {
+          groupNames.add(group.name);
+          for (const entityId of group.entityIds) {
+            addEntity(entityId);
+          }
+          for (const factId of group.factIds) {
+            addFact(factById.get(factId));
+          }
+          for (const [relationIndex, relation] of extractionV2.relations.entries()) {
+            if (entityIds.has(relation.fromEntityId) || entityIds.has(relation.toEntityId)) {
+              relationIndexes.add(relationIndex);
+            }
+          }
+        }
+        break;
+      }
+      default:
+        break;
+    }
+
+    return { entityIds, factIds, relationIndexes, groupNames };
+  }, [
+    hoverTarget,
+    extractionV2.facts,
+    extractionV2.relations,
+    extractionV2.groups,
+    factById,
+    groupByName,
+  ]);
 
   const copyDebugBundle = async () => {
     try {
@@ -212,7 +445,7 @@ const ExtractionContractView = ({
   };
 
   return (
-    <section data-testid="extraction-v2-result" style={{ display: 'grid', gap: 14 }}>
+    <section data-testid="extraction-v2-result" style={{ display: 'grid', gap: 18 }}>
       <div>
         <h3 style={{ marginBottom: 6 }}>Extraction Metadata</h3>
         <ul data-testid="extraction-v2-metadata" style={{ margin: 0, paddingLeft: 18 }}>
@@ -270,154 +503,229 @@ const ExtractionContractView = ({
         <pre
           data-testid="extraction-v2-source"
           style={{
-            border: '1px solid #d0d7de',
-            borderRadius: 8,
-            padding: 10,
+            border: '1px solid #c3ccd5',
+            borderRadius: 14,
+            background: '#f6f7f9',
+            padding: 16,
             whiteSpace: 'pre-wrap',
-            lineHeight: 1.5,
+            lineHeight: 1.45,
+            fontSize: 19,
             margin: 0,
           }}
         >
-          {sourceText}
+          {sourceTokens.map((token) => {
+            if (!token.entityId) {
+              return <span key={`plain-${token.start}`}>{token.text}</span>;
+            }
+            const entityId = token.entityId;
+            const entity = entityById.get(entityId);
+            const swatch = getEntitySwatch(entityId);
+            const activeEntity = active.entityIds.has(entityId);
+            return (
+              <span
+                key={`entity-${entityId}-${token.start}`}
+                data-testid={`source-entity-${entityId}`}
+                data-active={activeEntity ? 'true' : 'false'}
+                onMouseEnter={() => setHoverTarget({ kind: 'entity', entityId })}
+                onMouseLeave={() => setHoverTarget(null)}
+                style={{
+                  background: swatch.fill,
+                  borderRadius: 7,
+                  padding: '0 3px',
+                  boxShadow: activeEntity ? `0 0 0 2px ${swatch.accent} inset` : 'none',
+                  cursor: 'pointer',
+                  transition: 'box-shadow 0.08s ease',
+                }}
+                title={entity ? `${entity.name} (${entity.type})` : entityId}
+              >
+                {token.text}
+              </span>
+            );
+          })}
         </pre>
       </div>
 
       <div>
         <h3 style={{ marginBottom: 6 }}>Entities</h3>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th>id</th>
-                <th>name</th>
-                <th>type</th>
-                <th>nameSpan</th>
-                <th>evidenceSpan</th>
-                <th>context</th>
-                <th>confidence</th>
-                <th>excerpt</th>
-              </tr>
-            </thead>
-            <tbody data-testid="extraction-v2-entities">
-              {extractionV2.entities.map((entity) => (
-                <tr key={entity.id} data-testid={`entity-row-${entity.id}`}>
-                  <td>{entity.id}</td>
-                  <td>{entity.name}</td>
-                  <td>{entity.type}</td>
-                  <td>{formatSpan(entity.nameStart, entity.nameEnd)}</td>
-                  <td>{formatOptionalSpan(entity.evidenceStart, entity.evidenceEnd)}</td>
-                  <td>{entity.context ?? '-'}</td>
-                  <td>{entity.confidence.toFixed(2)}</td>
-                  <td data-testid={`entity-excerpt-${entity.id}`}>
-                    {getExcerpt(sourceText, entity.nameStart, entity.nameEnd)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul
+          data-testid="extraction-v2-entities"
+          style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'grid', gap: 8 }}
+        >
+          {extractionV2.entities.map((entity) => {
+            const swatch = getEntitySwatch(entity.id);
+            const isActive = active.entityIds.has(entity.id);
+            return (
+              <li
+                key={entity.id}
+                data-testid={`entity-row-${entity.id}`}
+                data-active={isActive ? 'true' : 'false'}
+                onMouseEnter={() => setHoverTarget({ kind: 'entity', entityId: entity.id })}
+                onMouseLeave={() => setHoverTarget(null)}
+                style={{
+                  border: isActive ? `2px solid ${swatch.accent}` : '1px solid #d0d7de',
+                  borderRadius: 12,
+                  padding: '8px 10px',
+                  background: isActive ? '#fffaf0' : '#fff',
+                  transition: 'border-color 0.08s ease',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span
+                    aria-hidden
+                    style={{
+                      width: 14,
+                      height: 14,
+                      borderRadius: '50%',
+                      background: swatch.fill,
+                      border: `1px solid ${swatch.accent}`,
+                    }}
+                  />
+                  <strong>{entity.name}</strong> ({entity.type}) [
+                  {formatSpan(entity.nameStart, entity.nameEnd)}]
+                  <span style={{ opacity: 0.7 }}>id={entity.id}</span>
+                  <span style={{ opacity: 0.7 }}>
+                    evidence={formatOptionalSpan(entity.evidenceStart, entity.evidenceEnd)}
+                  </span>
+                  <span style={{ opacity: 0.7 }}>confidence={entity.confidence.toFixed(2)}</span>
+                </div>
+                <div
+                  data-testid={`entity-excerpt-${entity.id}`}
+                  style={{ marginTop: 4, opacity: 0.9 }}
+                >
+                  {getExcerpt(sourceText, entity.nameStart, entity.nameEnd)}
+                </div>
+                {entity.context ? (
+                  <div style={{ marginTop: 2, opacity: 0.75 }}>context: {entity.context}</div>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
       </div>
 
       <div>
         <h3 style={{ marginBottom: 6 }}>Facts</h3>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th>id</th>
-                <th>ownerEntityId</th>
-                <th>perspective</th>
-                <th>subjectEntityId</th>
-                <th>predicate</th>
-                <th>object</th>
-                <th>segmentId</th>
-                <th>evidenceSpan</th>
-                <th>confidence</th>
-                <th>excerpt</th>
-              </tr>
-            </thead>
-            <tbody data-testid="extraction-v2-facts">
-              {extractionV2.facts.map((fact) => (
-                <tr key={fact.id} data-testid={`fact-row-${fact.id}`}>
-                  <td>{fact.id}</td>
-                  <td>{getEntityLabel(fact.ownerEntityId)}</td>
-                  <td>{fact.perspective}</td>
-                  <td>{getEntityLabel(fact.subjectEntityId)}</td>
-                  <td>{fact.predicate}</td>
-                  <td>
-                    {fact.objectEntityId
-                      ? getEntityLabel(fact.objectEntityId)
-                      : (fact.objectText ?? '-')}
-                  </td>
-                  <td>{fact.segmentId ?? '-'}</td>
-                  <td>{formatSpan(fact.evidenceStart, fact.evidenceEnd)}</td>
-                  <td>{fact.confidence.toFixed(2)}</td>
-                  <td>{getExcerpt(sourceText, fact.evidenceStart, fact.evidenceEnd)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul
+          data-testid="extraction-v2-facts"
+          style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'grid', gap: 8 }}
+        >
+          {extractionV2.facts.map((fact) => {
+            const ownerSwatch = getEntitySwatch(fact.ownerEntityId);
+            const isActive = active.factIds.has(fact.id);
+            return (
+              <li
+                key={fact.id}
+                data-testid={`fact-row-${fact.id}`}
+                data-active={isActive ? 'true' : 'false'}
+                onMouseEnter={() => setHoverTarget({ kind: 'fact', factId: fact.id })}
+                onMouseLeave={() => setHoverTarget(null)}
+                style={{
+                  borderLeft: `5px solid ${ownerSwatch.accent}`,
+                  borderRadius: 10,
+                  padding: '8px 10px',
+                  background: isActive ? '#f8f2e7' : '#f7f7f8',
+                  outline: isActive ? `2px solid ${ownerSwatch.accent}` : 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <div>
+                  owner=<strong>{getEntityLabel(fact.ownerEntityId)}</strong> perspective=
+                  <strong>{fact.perspective}</strong> | {getEntityLabel(fact.subjectEntityId)}{' '}
+                  {'->'} <strong>{fact.predicate}</strong> {'->'}{' '}
+                  {fact.objectEntityId
+                    ? getEntityLabel(fact.objectEntityId)
+                    : (fact.objectText ?? '-')}{' '}
+                  | [{formatSpan(fact.evidenceStart, fact.evidenceEnd)}]
+                </div>
+                <div style={{ marginTop: 3, opacity: 0.78 }}>
+                  id={fact.id} segment={fact.segmentId ?? '-'} confidence=
+                  {fact.confidence.toFixed(2)}
+                </div>
+                <div style={{ marginTop: 2, opacity: 0.85 }}>
+                  {getExcerpt(sourceText, fact.evidenceStart, fact.evidenceEnd)}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       </div>
 
       <div>
         <h3 style={{ marginBottom: 6 }}>Relations</h3>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>fromEntityId</th>
-                <th>toEntityId</th>
-                <th>type</th>
-                <th>evidenceSpan</th>
-                <th>confidence</th>
-              </tr>
-            </thead>
-            <tbody data-testid="extraction-v2-relations">
-              {extractionV2.relations.map((relation, index) => (
-                <tr
+        <ul
+          data-testid="extraction-v2-relations"
+          style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'grid', gap: 8 }}
+        >
+          {extractionV2.relations.length === 0 ? (
+            <li style={{ opacity: 0.7 }}>-</li>
+          ) : (
+            extractionV2.relations.map((relation, index) => {
+              const relationSwatch = getEntitySwatch(relation.fromEntityId);
+              const isActive = active.relationIndexes.has(index);
+              return (
+                <li
                   key={`${relation.fromEntityId}-${relation.toEntityId}-${relation.type}-${index}`}
+                  data-testid={`relation-row-${index}`}
+                  data-active={isActive ? 'true' : 'false'}
+                  onMouseEnter={() => setHoverTarget({ kind: 'relation', relationIndex: index })}
+                  onMouseLeave={() => setHoverTarget(null)}
+                  style={{
+                    border: isActive ? `2px solid ${relationSwatch.accent}` : '1px solid #d0d7de',
+                    borderRadius: 10,
+                    padding: '8px 10px',
+                    background: isActive ? '#f3f8ff' : '#fff',
+                    cursor: 'pointer',
+                  }}
                 >
-                  <td>{index}</td>
-                  <td>{getEntityLabel(relation.fromEntityId)}</td>
-                  <td>{getEntityLabel(relation.toEntityId)}</td>
-                  <td>{relation.type}</td>
-                  <td>{formatOptionalSpan(relation.evidenceStart, relation.evidenceEnd)}</td>
-                  <td>{relation.confidence.toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  #{index} {getEntityLabel(relation.fromEntityId)} {'->'}{' '}
+                  <strong>{relation.type}</strong> {'->'} {getEntityLabel(relation.toEntityId)} |
+                  evidence=
+                  {formatOptionalSpan(relation.evidenceStart, relation.evidenceEnd)} | confidence=
+                  {relation.confidence.toFixed(2)}
+                </li>
+              );
+            })
+          )}
+        </ul>
       </div>
 
       <div>
         <h3 style={{ marginBottom: 6 }}>Groups</h3>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th>name</th>
-                <th>entityIds</th>
-                <th>factIds</th>
-              </tr>
-            </thead>
-            <tbody data-testid="extraction-v2-groups">
-              {extractionV2.groups.map((group) => (
-                <tr key={group.name}>
-                  <td>{group.name}</td>
-                  <td>
-                    {group.entityIds.length === 0
-                      ? '-'
-                      : group.entityIds.map((entityId) => getEntityLabel(entityId)).join(', ')}
-                  </td>
-                  <td>{group.factIds.length === 0 ? '-' : group.factIds.join(', ')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul
+          data-testid="extraction-v2-groups"
+          style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'grid', gap: 8 }}
+        >
+          {extractionV2.groups.length === 0 ? (
+            <li style={{ opacity: 0.7 }}>-</li>
+          ) : (
+            extractionV2.groups.map((group) => {
+              const isActive = active.groupNames.has(group.name);
+              return (
+                <li
+                  key={group.name}
+                  data-testid={`group-row-${group.name.replace(/\s+/g, '-')}`}
+                  data-active={isActive ? 'true' : 'false'}
+                  onMouseEnter={() => setHoverTarget({ kind: 'group', groupName: group.name })}
+                  onMouseLeave={() => setHoverTarget(null)}
+                  style={{
+                    border: isActive ? '2px solid #4c6ef5' : '1px solid #d0d7de',
+                    borderRadius: 10,
+                    padding: '8px 10px',
+                    background: isActive ? '#edf2ff' : '#fff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <strong>{group.name}</strong> | entities=
+                  {group.entityIds.length === 0
+                    ? '-'
+                    : group.entityIds.map((entityId) => getEntityLabel(entityId)).join(', ')}{' '}
+                  | facts={group.factIds.length === 0 ? '-' : group.factIds.join(', ')}
+                </li>
+              );
+            })
+          )}
+        </ul>
       </div>
 
       <details>
