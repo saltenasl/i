@@ -214,6 +214,104 @@ describe('createBackendHandlers', () => {
     expect(result.data.extraction.items[0]?.value).toBe('llama.cpp');
     expect(result.data.extractionV2.entities[0]?.name).toBe('llama.cpp');
     expect(result.data.debug.runtime.serverMode).toBe('cpu');
+
+    const historyResult = await handlers['extract.history.list']({ limit: 10 });
+    expect(historyResult.ok).toBe(true);
+    if (!historyResult.ok) {
+      return;
+    }
+
+    expect(historyResult.data.entries).toHaveLength(1);
+    expect(historyResult.data.entries[0]?.prompt).toBe('prompt');
+    expect(historyResult.data.entries[0]?.sourceText).toBe('Use llama.cpp locally.');
+  });
+
+  it('lists extraction history using default and bounded limits', async () => {
+    if (!harness) {
+      throw new Error('DB harness was not initialized.');
+    }
+
+    const handlers = createBackendHandlers({
+      db: harness.db,
+      runExtractionBundle: async (text) => ({
+        extraction: { title: text.slice(0, 12), items: [], groups: [] },
+        extractionV2: {
+          title: text.slice(0, 12),
+          noteType: 'personal',
+          summary: text,
+          language: 'en',
+          date: null,
+          sentiment: 'neutral',
+          emotions: [],
+          entities: [],
+          facts: [],
+          relations: [],
+          groups: [],
+          segments: [],
+        },
+        debug: {
+          inputText: text,
+          prompt: `prompt:${text}`,
+          rawModelOutput: '{}',
+          validatedExtractionV2BeforeSegmentation: {
+            title: text.slice(0, 12),
+            noteType: 'personal',
+            summary: text,
+            language: 'en',
+            date: null,
+            sentiment: 'neutral',
+            emotions: [],
+            entities: [],
+            facts: [],
+            relations: [],
+            groups: [],
+            segments: [],
+          },
+          finalExtractionV2: {
+            title: text.slice(0, 12),
+            noteType: 'personal',
+            summary: text,
+            language: 'en',
+            date: null,
+            sentiment: 'neutral',
+            emotions: [],
+            entities: [],
+            facts: [],
+            relations: [],
+            groups: [],
+            segments: [],
+          },
+          finalExtractionV1: { title: text.slice(0, 12), items: [], groups: [] },
+          segmentationTrace: [],
+          runtime: {
+            modelPath: '/tmp/model.gguf',
+            serverMode: 'cpu',
+            nPredict: 220,
+            totalMs: 10,
+          },
+          fallbackUsed: false,
+          errors: [],
+        },
+      }),
+    });
+
+    await handlers['extract.run']({ text: 'first' });
+    await handlers['extract.run']({ text: 'second' });
+    await handlers['extract.run']({ text: 'third' });
+
+    const limited = await handlers['extract.history.list']({ limit: 2 });
+    expect(limited.ok).toBe(true);
+    if (!limited.ok) {
+      return;
+    }
+    expect(limited.data.entries).toHaveLength(2);
+
+    const invalidLimit = await handlers['extract.history.list']({ limit: -4 });
+    expect(invalidLimit.ok).toBe(true);
+    if (!invalidLimit.ok) {
+      return;
+    }
+    expect(invalidLimit.data.entries).toHaveLength(3);
   });
 
   it('runs compare lane through injected lane dependency', async () => {

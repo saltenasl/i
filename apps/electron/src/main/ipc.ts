@@ -19,6 +19,8 @@ const invokeHandler = async (
       return handlers['notes.create'](request.input);
     case 'extract.run':
       return handlers['extract.run'](request.input);
+    case 'extract.history.list':
+      return handlers['extract.history.list'](request.input);
     case 'extract.compareLane':
       return handlers['extract.compareLane'](request.input);
     case 'extract.compare':

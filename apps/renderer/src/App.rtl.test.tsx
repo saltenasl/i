@@ -316,6 +316,20 @@ describe('App (RTL with real backend implementation)', () => {
     await user.click(screen.getByTestId('copy-debug-bundle'));
     expect(clipboardMock).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('copy-debug-state')).toHaveTextContent('Copied');
+
+    expect(await screen.findByTestId('extraction-history-list')).toBeInTheDocument();
+    const historyCheckboxes = screen.getAllByRole('checkbox');
+    const firstHistoryCheckbox = historyCheckboxes[0];
+    expect(firstHistoryCheckbox).toBeDefined();
+    if (!firstHistoryCheckbox) {
+      throw new Error('Expected at least one extraction history checkbox.');
+    }
+    await user.click(firstHistoryCheckbox);
+
+    expect(screen.getByTestId('history-copy-selected-floating')).toBeInTheDocument();
+    await user.click(screen.getByTestId('history-copy-selected-button'));
+    expect(clipboardMock).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId('history-copy-selected-state')).toHaveTextContent('Copied');
   });
 
   it('shows compare loading and per-lane progress transitions', async () => {

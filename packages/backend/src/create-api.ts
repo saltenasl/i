@@ -11,6 +11,10 @@ import {
 } from '@repo/api';
 import { extractCompare, extractCompareLane, extractWithDebug } from '@repo/auto-extract';
 import type { DbClient } from '@repo/db';
+import {
+  listExtractionHistoryService,
+  persistExtractionHistoryService,
+} from './services/extraction-history-service.js';
 import { createNoteService, listNotesService } from './services/note-service.js';
 
 export interface BackendDependencies {
@@ -55,10 +59,25 @@ export const createBackendHandlers = (deps: BackendDependencies): ApiHandlers =>
 
     try {
       const bundle = await (deps.runExtractionBundle ?? extractWithDebug)(text);
-      // TODO: persist extractionV2 graph projection in DB once graph storage is introduced.
+      await persistExtractionHistoryService(deps.db, {
+        sourceText: text,
+        prompt: bundle.debug.prompt,
+        extraction: bundle.extraction,
+        extractionV2: bundle.extractionV2,
+        debug: bundle.debug,
+      });
       return ok(bundle);
     } catch (error) {
       return err('INTERNAL_ERROR', 'Failed to extract text.', {
+        cause: error instanceof Error ? error.message : String(error),
+      });
+    }
+  },
+  'extract.history.list': async (input: ApiInput<'extract.history.list'>) => {
+    try {
+      return await listExtractionHistoryService(deps.db, input);
+    } catch (error) {
+      return err('DB_ERROR', 'Failed to list extraction history.', {
         cause: error instanceof Error ? error.message : String(error),
       });
     }

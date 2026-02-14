@@ -1,6 +1,7 @@
 import type {
   Extraction,
   ExtractionDebug,
+  ExtractionHistoryEntryDto,
   ExtractionLaneId,
   ExtractionLaneResult,
   ExtractionV2,
@@ -723,16 +724,34 @@ const ExtractPage = () => {
   const api = useApi();
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isComparing, setIsComparing] = useState(false);
   const [compareCompleted, setCompareCompleted] = useState(0);
   const [compareLanes, setCompareLanes] = useState<CompareLaneUi[]>([]);
+  const [historyEntries, setHistoryEntries] = useState<ExtractionHistoryEntryDto[]>([]);
+  const [selectedHistoryIds, setSelectedHistoryIds] = useState<Set<string>>(new Set());
+  const [copySelectedState, setCopySelectedState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [result, setResult] = useState<{
     extraction: Extraction;
     extractionV2: ExtractionV2;
     debug: ExtractionDebug;
   } | null>(null);
   const [viewMode, setViewMode] = useState<'knowledge' | 'simple'>('knowledge');
+
+  const loadHistory = useCallback(async () => {
+    const response = await api.call('extract.history.list', { limit: 100 });
+    if (!response.ok) {
+      setHistoryError(response.error.message);
+      return;
+    }
+    setHistoryError(null);
+    setHistoryEntries(response.data.entries);
+  }, [api]);
+
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
 
   const submit = async () => {
     setIsSubmitting(true);
@@ -755,6 +774,7 @@ const ExtractPage = () => {
       extractionV2: response.data.extractionV2,
       debug: response.data.debug,
     });
+    await loadHistory();
   };
 
   const submitCompare = async () => {
@@ -820,6 +840,60 @@ const ExtractPage = () => {
     }
   };
 
+  const toggleHistorySelection = (entryId: string) => {
+    setSelectedHistoryIds((current) => {
+      const next = new Set(current);
+      if (next.has(entryId)) {
+        next.delete(entryId);
+      } else {
+        next.add(entryId);
+      }
+      return next;
+    });
+    setCopySelectedState('idle');
+  };
+
+  const selectedHistory = historyEntries.filter((entry) => selectedHistoryIds.has(entry.id));
+
+  const copySelectedDebugLogs = async () => {
+    try {
+      await navigator.clipboard.writeText(
+        JSON.stringify(
+          {
+            copiedAt: new Date().toISOString(),
+            count: selectedHistory.length,
+            entries: selectedHistory.map((entry) => ({
+              id: entry.id,
+              createdAt: entry.createdAt,
+              sourceText: entry.sourceText,
+              prompt: entry.prompt,
+              extraction: entry.extraction,
+              extractionV2: entry.extractionV2,
+              debug: entry.debug,
+            })),
+          },
+          null,
+          2,
+        ),
+      );
+      setCopySelectedState('copied');
+    } catch {
+      setCopySelectedState('error');
+    }
+  };
+
+  const openHistoryEntry = (entry: ExtractionHistoryEntryDto) => {
+    setText(entry.sourceText);
+    setResult({
+      extraction: entry.extraction,
+      extractionV2: entry.extractionV2,
+      debug: entry.debug,
+    });
+    setViewMode('knowledge');
+    setError(null);
+    setCompareLanes([]);
+  };
+
   return (
     <section>
       <h1>Auto Extract</h1>
@@ -860,6 +934,12 @@ const ExtractPage = () => {
       {error ? (
         <p role="alert" data-testid="extract-error-message">
           {error}
+        </p>
+      ) : null}
+
+      {historyError ? (
+        <p role="alert" data-testid="extract-history-error">
+          {historyError}
         </p>
       ) : null}
 
@@ -944,6 +1024,131 @@ const ExtractPage = () => {
             })}
           </div>
         </section>
+      ) : null}
+
+      <section data-testid="extraction-history" style={{ marginTop: 20, display: 'grid', gap: 10 }}>
+        <h2 style={{ margin: 0, fontSize: 18 }}>Extraction History</h2>
+        {historyEntries.length === 0 ? (
+          <p data-testid="extraction-history-empty" style={{ margin: 0, opacity: 0.75 }}>
+            No extraction history yet.
+          </p>
+        ) : (
+          <ul
+            data-testid="extraction-history-list"
+            style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'grid', gap: 10 }}
+          >
+            {historyEntries.map((entry) => {
+              const selected = selectedHistoryIds.has(entry.id);
+              return (
+                <li
+                  key={entry.id}
+                  data-testid={`history-item-${entry.id}`}
+                  style={{
+                    position: 'relative',
+                    border: selected ? '1px solid #f08c00' : '1px solid #d0d7de',
+                    borderRadius: 10,
+                    padding: '10px 14px',
+                    background: selected ? '#fff9db' : '#fff',
+                  }}
+                >
+                  <label
+                    data-testid={`history-checkbox-floating-${entry.id}`}
+                    style={{
+                      position: 'absolute',
+                      top: 10,
+                      right: -14,
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      border: '1px solid #cfd8e3',
+                      background: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                      cursor: 'pointer',
+                    }}
+                    title="Select debug bundle"
+                  >
+                    <input
+                      data-testid={`history-checkbox-${entry.id}`}
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => toggleHistorySelection(entry.id)}
+                    />
+                  </label>
+
+                  <button
+                    type="button"
+                    data-testid={`history-open-${entry.id}`}
+                    onClick={() => openHistoryEntry(entry)}
+                    style={{
+                      all: 'unset',
+                      cursor: 'pointer',
+                      display: 'block',
+                      width: '100%',
+                    }}
+                  >
+                    <div style={{ fontSize: 12, opacity: 0.75 }}>
+                      {new Date(entry.createdAt).toLocaleString()}
+                    </div>
+                    <div style={{ fontWeight: 700 }}>{entry.extractionV2.title}</div>
+                    <div style={{ fontSize: 13, opacity: 0.85 }}>{entry.extractionV2.summary}</div>
+                    <div style={{ fontSize: 12, marginTop: 4, opacity: 0.8 }}>
+                      Prompt: {entry.prompt.slice(0, 120)}
+                      {entry.prompt.length > 120 ? '...' : ''}
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {selectedHistory.length > 0 ? (
+        <div
+          data-testid="history-copy-selected-floating"
+          style={{
+            position: 'fixed',
+            right: 20,
+            bottom: 20,
+            zIndex: 40,
+            display: 'flex',
+            gap: 8,
+            alignItems: 'center',
+            background: '#111827',
+            color: '#fff',
+            borderRadius: 999,
+            padding: '10px 14px',
+            boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
+          }}
+        >
+          <button
+            type="button"
+            data-testid="history-copy-selected-button"
+            onClick={() => {
+              void copySelectedDebugLogs();
+            }}
+            style={{
+              border: '1px solid #4b5563',
+              background: '#1f2937',
+              color: '#fff',
+              borderRadius: 999,
+              padding: '6px 10px',
+              cursor: 'pointer',
+            }}
+          >
+            Copy {selectedHistory.length} debug log{selectedHistory.length === 1 ? '' : 's'}
+          </button>
+          <span data-testid="history-copy-selected-state" style={{ fontSize: 12, opacity: 0.9 }}>
+            {copySelectedState === 'copied'
+              ? 'Copied'
+              : copySelectedState === 'error'
+                ? 'Copy failed'
+                : ''}
+          </span>
+        </div>
       ) : null}
     </section>
   );

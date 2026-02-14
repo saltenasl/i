@@ -58,6 +58,7 @@ describe('runtime migrations', () => {
 
     const applied = await runMigrations(db);
     expect(applied).toContain('0002-add-notes-title-index');
+    expect(applied).toContain('0003-create-extraction-history');
 
     const indexResult = await sql<{ name: string }>`
       PRAGMA index_list('notes')
@@ -65,6 +66,13 @@ describe('runtime migrations', () => {
 
     const indexNames = indexResult.rows.map((row) => row.name);
     expect(indexNames).toContain('idx_notes_title');
+
+    const extractionTable = await sql<{ name: string }>`
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'table' AND name = 'extraction_history'
+    `.execute(db);
+    expect(extractionTable.rows[0]?.name).toBe('extraction_history');
 
     await db.destroy();
   });

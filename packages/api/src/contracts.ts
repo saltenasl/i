@@ -15,6 +15,16 @@ export interface NoteDto {
   updatedAt: string;
 }
 
+export interface ExtractionHistoryEntryDto {
+  id: string;
+  sourceText: string;
+  prompt: string;
+  extraction: Extraction;
+  extractionV2: ExtractionV2;
+  debug: ExtractionDebug;
+  createdAt: string;
+}
+
 export type Extraction = {
   title: string;
   memory?: string;
@@ -156,6 +166,12 @@ export interface ApiMethodMap {
       { extraction: Extraction; extractionV2: ExtractionV2; debug: ExtractionDebug },
       AppErrorCode
     >;
+  };
+  'extract.history.list': {
+    input: {
+      limit?: number;
+    };
+    output: Result<{ entries: ExtractionHistoryEntryDto[] }, AppErrorCode>;
   };
   'extract.compareLane': {
     input: {
