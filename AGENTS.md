@@ -13,6 +13,7 @@
 - Always commit completed work before finishing a user request.
 - Use `--no-gpg-sign` for commits in this repository workflow.
 - Mocking in tests is forbidden unless the user explicitly approves it for the current task.
+- `@repo/auto-extract` must be mocked/injected in tests by default; running real model extraction in tests is forbidden unless the user explicitly approves it for the current task.
 - Do not override explicit user decisions without asking for permission first.
 - Keep solutions minimal, robust, and future-proof.
 - Declare external dependencies in root `package.json` only (monolith dependency management).
@@ -39,6 +40,7 @@
 - E2E tests exercise full implementation (Electron + IPC + backend + SQLite).
 - E2E suite must cover both fresh and seeded DB profiles within a single run.
 - Mocks are blocked by policy checker unless explicitly authorized by user.
+- Real `@repo/auto-extract` inference is blocked in tests by policy checker due cost/latency; test flows must use injected/mocked extraction dependencies unless explicitly user-approved for the current task.
 
 ## Verification Pipeline
 `pnpm verify` must run all checks in deterministic order:
@@ -80,6 +82,7 @@
 - Auto-extract convention: `@repo/auto-extract` uses a local llama.cpp binary and local GGUF model auto-downloaded into `~/.auto-extract` with a single public API `extract(text)` and no Python runtime dependency.
 - Package naming convention: all workspace packages must use the `@repo/*` scope prefix for consistency and tooling alignment.
 - Testing exception convention: for RTL/backend tests, `auto-extract` behavior may be mocked when needed for deterministic test coverage, with explicit user-approved intent documented in the test.
+- Auto-extract test convention: tests must not call real `@repo/auto-extract` inference by default; any temporary unmocking requires explicit per-task user permission and an in-file override marker documented with rationale, due cost and runtime volatility.
 - Extraction pipeline convention: run one whole-note LLM extraction pass first (global-context), then deterministically derive segments from grounded spans; do not pre-split into multiple LLM calls by default.
 - Attribution convention: every fact must carry `ownerEntityId` and `perspective` (`self`/`other`/`uncertain`) to avoid conflating narrator facts with other entities.
 - Sentiment convention: use per-segment sentiment as primary query surface; top-level sentiment is a rollup and uses `varied` when segments differ.

@@ -15,7 +15,7 @@
     "format": "biome format --write .",
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
     "type-safety:check": "node --import tsx scripts/check-type-safety.ts",
-    "arch:check": "node --import tsx scripts/check-architecture.ts && node --import tsx scripts/check-no-mocks.ts",
+    "arch:check": "node --import tsx scripts/check-architecture.ts && node --import tsx scripts/check-no-mocks.ts && node --import tsx scripts/check-auto-extract-test-policy.ts",
     "db:generate-types": "node --import tsx packages/db/scripts/db-generate.ts",
     "db:verify": "node --import tsx packages/db/scripts/db-verify.ts && node --import tsx scripts/check-migration-discipline.ts",
     "test:backend": "vitest run -c packages/auto-extract/vitest.config.ts && vitest run -c packages/db/vitest.config.ts && vitest run -c packages/backend/vitest.config.ts",
