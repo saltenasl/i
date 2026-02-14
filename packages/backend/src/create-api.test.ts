@@ -99,19 +99,36 @@ describe('createBackendHandlers', () => {
 
     const handlers = createBackendHandlers({
       db: harness.db,
-      runExtraction: async (text) => ({
+      runExtractionV2: async (text) => ({
         title: 'Extracted',
-        memory: 'Keep local stack.',
-        items: [
+        noteType: 'reference',
+        summary: 'Uses local llama runtime.',
+        language: 'en',
+        date: null,
+        sentiment: 'neutral',
+        emotions: [],
+        entities: [
           {
-            label: 'tool',
-            value: 'llama.cpp',
-            start: text.indexOf('llama.cpp'),
-            end: text.indexOf('llama.cpp') + 'llama.cpp'.length,
+            id: 'ent_1',
+            name: 'llama.cpp',
+            type: 'tool',
+            nameStart: text.indexOf('llama.cpp'),
+            nameEnd: text.indexOf('llama.cpp') + 'llama.cpp'.length,
             confidence: 0.91,
           },
         ],
-        groups: [{ name: 'tools', itemIndexes: [0] }],
+        facts: [
+          {
+            id: 'fact_1',
+            subjectEntityId: 'ent_1',
+            predicate: 'used_for_extraction',
+            evidenceStart: text.indexOf('llama.cpp'),
+            evidenceEnd: text.indexOf('llama.cpp') + 'llama.cpp'.length,
+            confidence: 0.9,
+          },
+        ],
+        relations: [],
+        groups: [{ name: 'tools', entityIds: ['ent_1'], factIds: ['fact_1'] }],
       }),
     });
 
@@ -123,5 +140,6 @@ describe('createBackendHandlers', () => {
 
     expect(result.data.extraction.title).toBe('Extracted');
     expect(result.data.extraction.items[0]?.value).toBe('llama.cpp');
+    expect(result.data.extractionV2.entities[0]?.name).toBe('llama.cpp');
   });
 });

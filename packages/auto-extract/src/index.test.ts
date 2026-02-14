@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { Extraction } from './types.js';
-import { parseAndValidateExtractionOutput, validateExtraction } from './validate.js';
+import type { Extraction, ExtractionV2 } from './types.js';
+import {
+  normalizeGroupsV2,
+  parseAndValidateExtractionOutput,
+  validateExtraction,
+  validateExtractionV2,
+} from './validate.js';
 
 const SOURCE_TEXT = 'I want Gemma 2B Q5 with llama.cpp under 3GB RAM';
 
@@ -76,7 +81,7 @@ describe('validateExtraction', () => {
     );
   });
 
-  it('rejects out-of-range indices', () => {
+  it('repairs out-of-range indices when value is grounded', () => {
     const extraction = createValidExtraction();
     const firstItem = extraction.items[0];
     if (!firstItem) {
@@ -87,7 +92,9 @@ describe('validateExtraction', () => {
       start: -1,
     };
 
-    expect(() => validateExtraction(SOURCE_TEXT, extraction)).toThrow(/invalid start\/end/i);
+    const result = validateExtraction(SOURCE_TEXT, extraction);
+    expect(result.items[0]?.value).toBe('Gemma 2B Q5');
+    expect(result.items[0]?.start).toBe(SOURCE_TEXT.indexOf('Gemma 2B Q5'));
   });
 
   it('rejects title longer than 25 chars', () => {
@@ -138,6 +145,142 @@ describe('validateExtraction', () => {
     expect(() => validateExtraction(SOURCE_TEXT, extraction)).toThrow(
       /missing required explicit mention extraction/i,
     );
+  });
+});
+
+const V2_TEXT =
+  "we were driving and there was ice on the highway today. Egle was driving, she was scared. There's a ton of snow here in Klaipeda. Maybe when I was a kid the seaside had so much snow it was all white dunes.";
+
+const createValidExtractionV2 = (): ExtractionV2 => {
+  const egleStart = V2_TEXT.indexOf('Egle');
+  const drivingStart = V2_TEXT.indexOf('Egle was driving');
+  const klaipedaStart = V2_TEXT.indexOf('Klaipeda');
+  const memoryStart = V2_TEXT.indexOf('when I was a kid');
+  const memoryEnd = V2_TEXT.indexOf('white dunes') + 'white dunes'.length;
+
+  if (egleStart < 0 || drivingStart < 0 || klaipedaStart < 0 || memoryStart < 0 || memoryEnd < 0) {
+    throw new Error('Expected V2 fixture spans to exist in source text.');
+  }
+
+  return {
+    title: 'Winter drive note',
+    noteType: 'personal',
+    summary: 'I noticed dangerous winter road conditions while traveling.',
+    language: 'en',
+    date: null,
+    sentiment: 'mixed',
+    emotions: [{ emotion: 'fear', intensity: 4 }],
+    entities: [
+      {
+        id: 'ent-egle',
+        name: 'Egle',
+        type: 'person',
+        nameStart: egleStart,
+        nameEnd: egleStart + 'Egle'.length,
+        evidenceStart: drivingStart,
+        evidenceEnd: drivingStart + 'Egle was driving'.length,
+        context: 'driving in icy conditions',
+        confidence: 0.9,
+      },
+      {
+        id: 'ent-klaipeda',
+        name: 'Klaipeda',
+        type: 'place',
+        nameStart: klaipedaStart,
+        nameEnd: klaipedaStart + 'Klaipeda'.length,
+        confidence: 0.88,
+      },
+    ],
+    facts: [
+      {
+        id: 'fact-drive',
+        subjectEntityId: 'ent-egle',
+        predicate: 'drove_to',
+        objectEntityId: 'ent-klaipeda',
+        evidenceStart: drivingStart,
+        evidenceEnd: drivingStart + 'Egle was driving'.length,
+        confidence: 0.86,
+      },
+      {
+        id: 'fact-memory',
+        predicate: 'childhood_memory',
+        objectText: V2_TEXT.slice(memoryStart, memoryEnd),
+        evidenceStart: memoryStart,
+        evidenceEnd: memoryEnd,
+        confidence: 0.75,
+      },
+    ],
+    relations: [
+      {
+        fromEntityId: 'ent-egle',
+        toEntityId: 'ent-klaipeda',
+        type: 'drove_to',
+        confidence: 0.82,
+      },
+    ],
+    groups: [
+      {
+        name: 'people',
+        entityIds: ['ent-egle'],
+        factIds: ['fact-drive'],
+      },
+    ],
+  };
+};
+
+describe('validateExtractionV2', () => {
+  it('extracts person as canonical name with evidence span', () => {
+    const extraction = validateExtractionV2(V2_TEXT, createValidExtractionV2());
+    const egle = extraction.entities.find((entity) => entity.id === 'ent-egle');
+    expect(egle?.name).toBe('Egle');
+    expect(egle?.type).toBe('person');
+    expect(V2_TEXT.slice(egle?.evidenceStart ?? 0, egle?.evidenceEnd ?? 0)).toContain(
+      'was driving',
+    );
+  });
+
+  it('keeps place entity and memory fact grounded', () => {
+    const extraction = validateExtractionV2(V2_TEXT, createValidExtractionV2());
+    const place = extraction.entities.find((entity) => entity.type === 'place');
+    const memoryFact = extraction.facts.find((fact) => fact.id === 'fact-memory');
+    expect(place?.name).toBe('Klaipeda');
+    expect(memoryFact).toBeDefined();
+    expect(V2_TEXT.slice(memoryFact?.evidenceStart ?? 0, memoryFact?.evidenceEnd ?? 0)).toContain(
+      'when I was a kid',
+    );
+  });
+
+  it('normalizes groups into taxonomy buckets instead of one generic group', () => {
+    const extraction = validateExtractionV2(V2_TEXT, createValidExtractionV2());
+    const names = extraction.groups.map((group) => group.name);
+    expect(names).toContain('people');
+    expect(names).toContain('places');
+    expect(names).toContain('actions');
+    expect(names).toContain('memories');
+  });
+
+  it('drops malformed relations while keeping extraction valid', () => {
+    const extraction = createValidExtractionV2();
+    extraction.relations.push({
+      fromEntityId: 'missing',
+      toEntityId: 'ent-klaipeda',
+      type: 'invalid',
+      confidence: 0.5,
+    });
+
+    const result = validateExtractionV2(V2_TEXT, extraction);
+    expect(result.relations).toHaveLength(1);
+    expect(result.relations[0]?.fromEntityId).toBe('ent-egle');
+  });
+
+  it('normalizes invalid custom groups to taxonomy', () => {
+    const extraction = createValidExtractionV2();
+    extraction.groups = [
+      { name: 'driving events', entityIds: ['ent-egle'], factIds: ['fact-drive'] },
+    ];
+
+    const normalized = normalizeGroupsV2(validateExtractionV2(V2_TEXT, extraction));
+    expect(normalized.some((group) => group.name === 'actions')).toBe(true);
   });
 });
 

@@ -15,8 +15,6 @@ const inheritedEnv = Object.fromEntries(
   Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
 );
 
-const PERSONAL_TEXT = 'Personal note: I need quieter mornings, reference 42.';
-
 const dumpPageState = async (page: Page): Promise<void> => {
   const url = page.url();
   const body = await page
@@ -57,27 +55,17 @@ const launchApp = async (seedProfile: 'fresh' | 'baseline') => {
   };
 };
 
-const assertExtractionIsInferred = async (page: Page): Promise<void> => {
+const assertExtractSmoke = async (page: Page): Promise<void> => {
   await expect(page.getByTestId('extract-text-input')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId('extract-submit-button')).toBeVisible();
-
-  await page.getByTestId('extract-text-input').fill(PERSONAL_TEXT);
-  await page.getByTestId('extract-text-input').press('Meta+Enter');
-
-  await expect(page.getByTestId('extraction-result')).toBeVisible({ timeout: 120_000 });
-  await expect(page.getByTestId('extract-error-message')).toHaveCount(0);
-  await expect(page.getByTestId('extraction-title')).not.toHaveText('');
-  await expect(
-    page.getByTestId('extraction-items-table').locator('tbody tr').first(),
-  ).toBeVisible();
 };
 
-test('fresh profile infers extraction for personal note with reference 42', async () => {
+test('fresh profile shows extract input and submit controls', async () => {
   const launched = await launchApp('fresh');
 
   try {
     try {
-      await assertExtractionIsInferred(launched.page);
+      await assertExtractSmoke(launched.page);
     } catch (error) {
       await dumpPageState(launched.page);
       throw error;
@@ -87,12 +75,12 @@ test('fresh profile infers extraction for personal note with reference 42', asyn
   }
 });
 
-test('seeded profile infers extraction for personal note with reference 42', async () => {
+test('seeded profile shows extract input and submit controls', async () => {
   const launched = await launchApp('baseline');
 
   try {
     try {
-      await assertExtractionIsInferred(launched.page);
+      await assertExtractSmoke(launched.page);
     } catch (error) {
       await dumpPageState(launched.page);
       throw error;

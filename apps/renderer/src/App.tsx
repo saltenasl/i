@@ -1,4 +1,4 @@
-import type { Extraction, NoteDto } from '@repo/api';
+import type { Extraction, ExtractionV2, NoteDto } from '@repo/api';
 import {
   type FormEvent,
   type KeyboardEvent,
@@ -328,24 +328,74 @@ const ExtractionView = ({
       <p style={{ marginTop: 12, fontSize: 13, opacity: 0.8 }}>
         Grouped items: {groupedItemIndexes.size}/{extraction.items.length}
       </p>
+    </section>
+  );
+};
 
-      <details style={{ marginTop: 10 }}>
-        <summary>Raw JSON</summary>
-        <pre
-          data-testid="extraction-raw-json"
-          style={{
-            marginTop: 10,
-            padding: 10,
-            borderRadius: 8,
-            border: '1px solid #d0d7de',
-            background: '#0d1117',
-            color: '#e6edf3',
-            overflowX: 'auto',
-          }}
-        >
-          {JSON.stringify(extraction, null, 2)}
-        </pre>
-      </details>
+const KnowledgeExtractionView = ({ extractionV2 }: { extractionV2: ExtractionV2 }) => {
+  return (
+    <section data-testid="extraction-v2-result" style={{ display: 'grid', gap: 14 }}>
+      <div>
+        <h3 style={{ marginBottom: 4 }}>Knowledge Summary</h3>
+        <p style={{ margin: 0 }}>{extractionV2.summary}</p>
+        <p style={{ margin: '6px 0 0', opacity: 0.8, fontSize: 13 }}>
+          Type: {extractionV2.noteType} | Language: {extractionV2.language} | Sentiment:{' '}
+          {extractionV2.sentiment}
+        </p>
+      </div>
+
+      <div>
+        <h3 style={{ marginBottom: 6 }}>Entities</h3>
+        <ul data-testid="extraction-v2-entities" style={{ margin: 0, paddingLeft: 18 }}>
+          {extractionV2.entities.map((entity) => (
+            <li key={entity.id}>
+              <strong>{entity.name}</strong> ({entity.type}){' '}
+              <span style={{ opacity: 0.75 }}>
+                [{entity.nameStart}-{entity.nameEnd}]
+              </span>
+              {entity.context ? ` - ${entity.context}` : ''}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <h3 style={{ marginBottom: 6 }}>Facts</h3>
+        <ul data-testid="extraction-v2-facts" style={{ margin: 0, paddingLeft: 18 }}>
+          {extractionV2.facts.map((fact) => (
+            <li key={fact.id}>
+              <strong>{fact.predicate}</strong>{' '}
+              <span style={{ opacity: 0.75 }}>
+                [{fact.evidenceStart}-{fact.evidenceEnd}]
+              </span>
+              {fact.objectText ? ` - ${fact.objectText}` : ''}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <h3 style={{ marginBottom: 6 }}>Relations</h3>
+        <ul data-testid="extraction-v2-relations" style={{ margin: 0, paddingLeft: 18 }}>
+          {extractionV2.relations.map((relation, index) => (
+            <li key={`${relation.fromEntityId}-${relation.toEntityId}-${relation.type}-${index}`}>
+              {relation.fromEntityId} → {relation.toEntityId} ({relation.type})
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <h3 style={{ marginBottom: 6 }}>Groups</h3>
+        <ul data-testid="extraction-v2-groups" style={{ margin: 0, paddingLeft: 18 }}>
+          {extractionV2.groups.map((group) => (
+            <li key={group.name}>
+              <strong>{group.name}</strong> - entities: {group.entityIds.length}, facts:{' '}
+              {group.factIds.length}
+            </li>
+          ))}
+        </ul>
+      </div>
     </section>
   );
 };
@@ -355,7 +405,11 @@ const ExtractPage = () => {
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [result, setResult] = useState<Extraction | null>(null);
+  const [result, setResult] = useState<{
+    extraction: Extraction;
+    extractionV2: ExtractionV2;
+  } | null>(null);
+  const [viewMode, setViewMode] = useState<'knowledge' | 'simple'>('knowledge');
 
   const submit = async () => {
     setIsSubmitting(true);
@@ -371,7 +425,10 @@ const ExtractPage = () => {
     }
 
     setError(null);
-    setResult(response.data.extraction);
+    setResult({
+      extraction: response.data.extraction,
+      extractionV2: response.data.extractionV2,
+    });
   };
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -414,7 +471,52 @@ const ExtractPage = () => {
         </p>
       ) : null}
 
-      {result ? <ExtractionView extraction={result} sourceText={text} /> : null}
+      {result ? (
+        <>
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+            <button
+              type="button"
+              data-testid="view-knowledge"
+              onClick={() => setViewMode('knowledge')}
+              style={{ fontWeight: viewMode === 'knowledge' ? 700 : 400 }}
+            >
+              Knowledge View
+            </button>
+            <button
+              type="button"
+              data-testid="view-simple"
+              onClick={() => setViewMode('simple')}
+              style={{ fontWeight: viewMode === 'simple' ? 700 : 400 }}
+            >
+              Simple View
+            </button>
+          </div>
+
+          {viewMode === 'knowledge' ? (
+            <KnowledgeExtractionView extractionV2={result.extractionV2} />
+          ) : (
+            <ExtractionView extraction={result.extraction} sourceText={text} />
+          )}
+
+          <details style={{ marginTop: 10 }}>
+            <summary>Raw JSON</summary>
+            <pre
+              data-testid="extraction-raw-json"
+              style={{
+                marginTop: 10,
+                padding: 10,
+                borderRadius: 8,
+                border: '1px solid #d0d7de',
+                background: '#0d1117',
+                color: '#e6edf3',
+                overflowX: 'auto',
+              }}
+            >
+              {JSON.stringify(result, null, 2)}
+            </pre>
+          </details>
+        </>
+      ) : null}
     </section>
   );
 };
