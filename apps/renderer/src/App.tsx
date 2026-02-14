@@ -552,6 +552,9 @@ const KnowledgeExtractionView = ({
               <span
                 key={chunk.key}
                 data-involved={chunk.involved ? 'true' : 'false'}
+                data-testid={`source-entity-${chunk.entityId}`}
+                onMouseEnter={() => setActiveEntityId(chunk.entityId)}
+                onMouseLeave={() => setActiveEntityId(null)}
                 style={{
                   background: chunk.involved ? '#ffe8cc' : baseColor,
                   borderRadius: 4,
@@ -561,6 +564,7 @@ const KnowledgeExtractionView = ({
                     activeEntityId && chunk.entityId !== activeEntityId && !chunk.involved
                       ? 0.65
                       : 1,
+                  cursor: 'pointer',
                 }}
                 title={entity ? `${entity.name} (${entity.type})` : chunk.entityId}
               >
