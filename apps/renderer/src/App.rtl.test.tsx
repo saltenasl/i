@@ -284,29 +284,15 @@ describe('App (RTL with real backend implementation)', () => {
 
     expect(await screen.findByTestId('extraction-v2-result')).toBeInTheDocument();
     expect(screen.getByTestId('extraction-v2-source')).toHaveTextContent('Egle was driving');
+    expect(screen.getByTestId('extraction-v2-metadata')).toHaveTextContent('noteType');
+    expect(screen.getByTestId('extraction-v2-metadata')).toHaveTextContent('personal');
     expect(screen.getByTestId('extraction-v2-entities')).toHaveTextContent('Klaipeda');
+    expect(screen.getByTestId('entity-row-ent_egle')).toHaveTextContent('ent_egle');
     expect(screen.getByTestId('entity-excerpt-ent_egle')).toHaveTextContent('driving');
-    expect(screen.getByTestId('extraction-v2-facts')).toHaveTextContent('owner=Egle');
-    expect(screen.getByTestId('extraction-v2-facts')).toHaveTextContent('perspective=other');
-    expect(screen.getByTestId('fact-row-fact_call')).toHaveAttribute('data-involved', 'false');
-    expect(screen.getByTestId('fact-row-fact_scared')).toHaveAttribute('data-involved', 'false');
-
-    await user.hover(screen.getByTestId('summary-entity-ent_egle'));
-    expect(screen.getByTestId('fact-row-fact_scared')).toHaveAttribute('data-involved', 'true');
-    await user.unhover(screen.getByTestId('summary-entity-ent_egle'));
-
-    await user.hover(screen.getByTestId('source-entity-ent_egle'));
-    expect(screen.getByTestId('fact-row-fact_scared')).toHaveAttribute('data-involved', 'true');
-    await user.unhover(screen.getByTestId('source-entity-ent_egle'));
-
-    await user.hover(screen.getByTestId('entity-row-ent_egle'));
-    expect(screen.getByTestId('fact-row-fact_call')).toHaveAttribute('data-involved', 'false');
-    expect(screen.getByTestId('fact-row-fact_scared')).toHaveAttribute('data-involved', 'true');
-
-    const sourceNode = screen.getByTestId('extraction-v2-source');
-    expect(sourceNode.querySelectorAll('[data-involved="true"]').length).toBeGreaterThan(0);
-    await user.unhover(screen.getByTestId('entity-row-ent_egle'));
-    expect(screen.getByTestId('fact-row-fact_scared')).toHaveAttribute('data-involved', 'false');
+    expect(screen.getByTestId('fact-row-fact_scared')).toHaveTextContent('other');
+    expect(screen.getByTestId('fact-row-fact_scared')).toHaveTextContent('ent_egle (Egle)');
+    expect(screen.getByTestId('extraction-v2-groups')).toHaveTextContent('people');
+    expect(screen.getByTestId('extraction-v1-json')).toHaveTextContent('Winter Drive');
 
     await user.click(screen.getByTestId('copy-debug-bundle'));
     expect(clipboardMock).toHaveBeenCalledTimes(1);
