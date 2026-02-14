@@ -301,6 +301,17 @@ describe('App (RTL with real backend implementation)', () => {
     expect(screen.getByTestId('extraction-v2-facts')).toHaveTextContent('owner=Egle');
     expect(screen.getByTestId('extraction-v2-facts')).toHaveTextContent('perspective=other');
     expect(screen.getByTestId('extraction-v2-segments')).toHaveTextContent('seg_2');
+    expect(screen.getByTestId('fact-row-fact_call')).toHaveAttribute('data-involved', 'false');
+    expect(screen.getByTestId('fact-row-fact_scared')).toHaveAttribute('data-involved', 'false');
+
+    await user.hover(screen.getByTestId('entity-row-ent_egle'));
+    expect(screen.getByTestId('fact-row-fact_call')).toHaveAttribute('data-involved', 'false');
+    expect(screen.getByTestId('fact-row-fact_scared')).toHaveAttribute('data-involved', 'true');
+
+    const sourceNode = screen.getByTestId('extraction-v2-source');
+    expect(sourceNode.querySelectorAll('[data-involved="true"]').length).toBeGreaterThan(0);
+    await user.unhover(screen.getByTestId('entity-row-ent_egle'));
+    expect(screen.getByTestId('fact-row-fact_scared')).toHaveAttribute('data-involved', 'false');
 
     await user.click(screen.getByTestId('copy-debug-bundle'));
     expect(clipboardMock).toHaveBeenCalledTimes(1);

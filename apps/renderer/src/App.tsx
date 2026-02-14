@@ -153,46 +153,78 @@ const getEntityColor = (index: number): string => {
   return entityColorPalette[index % entityColorPalette.length] ?? '#fff3bf';
 };
 
-const buildEntityChunks = (
+const buildSourceChunks = (
   text: string,
   extractionV2: ExtractionV2,
-): Array<{ key: string; text: string; entityId: string | null }> => {
-  const spans = extractionV2.entities
+  activeEntityId: string | null,
+): Array<{ key: string; text: string; entityId: string | null; involved: boolean }> => {
+  const entitySpans = extractionV2.entities
     .map((entity) => ({ id: entity.id, start: entity.nameStart, end: entity.nameEnd }))
-    .sort((a, b) => a.start - b.start);
+    .filter((span) => span.start >= 0 && span.end > span.start && span.end <= text.length);
 
-  const chunks: Array<{ key: string; text: string; entityId: string | null }> = [];
-  let cursor = 0;
-  let plainCount = 0;
+  const involvementSpans =
+    activeEntityId === null
+      ? []
+      : [
+          ...extractionV2.facts
+            .filter(
+              (fact) =>
+                fact.ownerEntityId === activeEntityId ||
+                fact.subjectEntityId === activeEntityId ||
+                fact.objectEntityId === activeEntityId,
+            )
+            .map((fact) => ({ start: fact.evidenceStart, end: fact.evidenceEnd })),
+          ...extractionV2.relations
+            .filter(
+              (relation) =>
+                relation.fromEntityId === activeEntityId || relation.toEntityId === activeEntityId,
+            )
+            .flatMap((relation) =>
+              relation.evidenceStart !== undefined && relation.evidenceEnd !== undefined
+                ? [{ start: relation.evidenceStart, end: relation.evidenceEnd }]
+                : [],
+            ),
+          ...extractionV2.entities
+            .filter((entity) => entity.id === activeEntityId)
+            .map((entity) => ({ start: entity.nameStart, end: entity.nameEnd })),
+        ];
 
-  for (const span of spans) {
-    if (span.start < cursor || span.start >= span.end || span.end > text.length) {
+  const boundaries = new Set<number>([0, text.length]);
+  for (const span of entitySpans) {
+    boundaries.add(span.start);
+    boundaries.add(span.end);
+  }
+  for (const span of involvementSpans) {
+    if (span.start >= 0 && span.end > span.start && span.end <= text.length) {
+      boundaries.add(span.start);
+      boundaries.add(span.end);
+    }
+  }
+
+  const sorted = Array.from(boundaries).sort((a, b) => a - b);
+  const chunks: Array<{ key: string; text: string; entityId: string | null; involved: boolean }> =
+    [];
+
+  for (let index = 0; index < sorted.length - 1; index += 1) {
+    const start = sorted[index];
+    const end = sorted[index + 1];
+    if (start === undefined || end === undefined || end <= start) {
       continue;
     }
 
-    if (span.start > cursor) {
-      chunks.push({
-        key: `plain-${plainCount}-${cursor}-${span.start}`,
-        text: text.slice(cursor, span.start),
-        entityId: null,
-      });
-      plainCount += 1;
+    const textChunk = text.slice(start, end);
+    if (!textChunk) {
+      continue;
     }
 
-    chunks.push({
-      key: `entity-${span.id}-${span.start}-${span.end}`,
-      text: text.slice(span.start, span.end),
-      entityId: span.id,
-    });
+    const ownerEntity = entitySpans.find((span) => span.start < end && span.end > start);
+    const involved = involvementSpans.some((span) => span.start < end && span.end > start);
 
-    cursor = span.end;
-  }
-
-  if (cursor < text.length) {
     chunks.push({
-      key: `plain-${plainCount}-${cursor}-${text.length}`,
-      text: text.slice(cursor),
-      entityId: null,
+      key: `chunk-${start}-${end}-${ownerEntity?.id ?? 'plain'}-${involved ? 'active' : 'idle'}`,
+      text: textChunk,
+      entityId: ownerEntity?.id ?? null,
+      involved,
     });
   }
 
@@ -276,6 +308,8 @@ const KnowledgeExtractionView = ({
   sourceText: string;
   debug: ExtractionDebug;
 }) => {
+  const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
+
   const entityOrder = useMemo(() => {
     return extractionV2.entities.map((entity, index) => ({
       id: entity.id,
@@ -292,8 +326,8 @@ const KnowledgeExtractionView = ({
   }, [extractionV2.entities]);
 
   const highlightedChunks = useMemo(() => {
-    return buildEntityChunks(sourceText, extractionV2);
-  }, [sourceText, extractionV2]);
+    return buildSourceChunks(sourceText, extractionV2, activeEntityId);
+  }, [sourceText, extractionV2, activeEntityId]);
 
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
 
@@ -362,17 +396,40 @@ const KnowledgeExtractionView = ({
         >
           {highlightedChunks.map((chunk) => {
             if (!chunk.entityId) {
-              return <span key={chunk.key}>{chunk.text}</span>;
+              return (
+                <span
+                  key={chunk.key}
+                  data-involved={chunk.involved ? 'true' : 'false'}
+                  style={
+                    chunk.involved
+                      ? {
+                          background: '#ffe8cc',
+                          borderRadius: 4,
+                          padding: '1px 1px',
+                        }
+                      : undefined
+                  }
+                >
+                  {chunk.text}
+                </span>
+              );
             }
 
             const entity = entityById.get(chunk.entityId);
+            const baseColor = colorByEntityId.get(chunk.entityId) ?? '#fff3bf';
             return (
               <span
                 key={chunk.key}
+                data-involved={chunk.involved ? 'true' : 'false'}
                 style={{
-                  background: colorByEntityId.get(chunk.entityId) ?? '#fff3bf',
+                  background: chunk.involved ? '#ffe8cc' : baseColor,
                   borderRadius: 4,
                   padding: '1px 2px',
+                  boxShadow: chunk.involved ? 'inset 0 -2px 0 #f08c00' : undefined,
+                  opacity:
+                    activeEntityId && chunk.entityId !== activeEntityId && !chunk.involved
+                      ? 0.65
+                      : 1,
                 }}
                 title={entity ? `${entity.name} (${entity.type})` : chunk.entityId}
               >
@@ -389,8 +446,20 @@ const KnowledgeExtractionView = ({
           {extractionV2.entities.map((entity, index) => {
             const excerptStart = entity.evidenceStart ?? entity.nameStart;
             const excerptEnd = entity.evidenceEnd ?? entity.nameEnd;
+            const isActive = activeEntityId === entity.id;
             return (
-              <li key={entity.id}>
+              <li
+                key={entity.id}
+                data-testid={`entity-row-${entity.id}`}
+                onMouseEnter={() => setActiveEntityId(entity.id)}
+                onMouseLeave={() => setActiveEntityId(null)}
+                style={{
+                  outline: isActive ? '2px solid #f08c00' : 'none',
+                  borderRadius: 6,
+                  padding: '2px 4px',
+                  cursor: 'pointer',
+                }}
+              >
                 <span
                   data-testid={`entity-color-${entity.id}`}
                   style={{
@@ -424,9 +493,23 @@ const KnowledgeExtractionView = ({
             const object = fact.objectEntityId
               ? (entityById.get(fact.objectEntityId)?.name ?? fact.objectEntityId)
               : (fact.objectText ?? '-');
+            const involved =
+              activeEntityId !== null &&
+              (fact.ownerEntityId === activeEntityId ||
+                fact.subjectEntityId === activeEntityId ||
+                fact.objectEntityId === activeEntityId);
 
             return (
-              <li key={fact.id}>
+              <li
+                key={fact.id}
+                data-testid={`fact-row-${fact.id}`}
+                data-involved={involved ? 'true' : 'false'}
+                style={{
+                  background: involved ? '#fff4e6' : undefined,
+                  borderLeft: involved ? '3px solid #f08c00' : undefined,
+                  paddingLeft: involved ? 6 : undefined,
+                }}
+              >
                 owner=<strong>{owner}</strong> perspective=<strong>{fact.perspective}</strong> |{' '}
                 {subject} → <strong>{formatPredicate(fact.predicate)}</strong> → {object} [
                 {fact.evidenceStart}-{fact.evidenceEnd}]
