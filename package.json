@@ -25,11 +25,15 @@
     "prepare": "simple-git-hooks"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.44",
+    "@ai-sdk/openai": "^3.0.29",
     "@repo/api": "workspace:*",
     "@repo/backend": "workspace:*",
     "@repo/db": "workspace:*",
     "@repo/test-utils": "workspace:*",
     "@repo/auto-extract": "workspace:*",
+    "ai": "^6.0.86",
+    "dotenv": "^17.2.3",
     "kysely": "^0.28.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

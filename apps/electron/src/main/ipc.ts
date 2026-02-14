@@ -19,7 +19,13 @@ const invokeHandler = async (
       return handlers['notes.create'](request.input);
     case 'extract.run':
       return handlers['extract.run'](request.input);
+    case 'extract.compareLane':
+      return handlers['extract.compareLane'](request.input);
+    case 'extract.compare':
+      return handlers['extract.compare'](request.input);
   }
+
+  throw new Error(`Unsupported IPC method: ${(request as AnyIpcApiRequest).method}`);
 };
 
 export const registerIpcApiHandlers = (handlers: ApiHandlers): void => {

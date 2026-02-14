@@ -58,6 +58,7 @@ const launchApp = async (seedProfile: 'fresh' | 'baseline') => {
 const assertExtractSmoke = async (page: Page): Promise<void> => {
   await expect(page.getByTestId('extract-text-input')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId('extract-submit-button')).toBeVisible();
+  await expect(page.getByTestId('extract-compare-button')).toBeVisible();
 };
 
 test('fresh profile shows extract input and submit controls', async () => {

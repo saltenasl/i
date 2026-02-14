@@ -1,4 +1,11 @@
-import type { Extraction, ExtractionDebug, ExtractionV2, NoteDto } from '@repo/api';
+import type {
+  Extraction,
+  ExtractionDebug,
+  ExtractionLaneId,
+  ExtractionLaneResult,
+  ExtractionV2,
+  NoteDto,
+} from '@repo/api';
 import {
   type FormEvent,
   type KeyboardEvent,
@@ -461,11 +468,175 @@ const KnowledgeExtractionView = ({
   );
 };
 
+const compareLaneOrder: ExtractionLaneId[] = ['local-llama', 'anthropic-haiku', 'openai-gpt5mini'];
+
+const compareLaneMeta: Record<
+  ExtractionLaneId,
+  { label: string; providerLabel: string; model: string }
+> = {
+  'local-llama': {
+    label: 'Local Llama',
+    providerLabel: 'Local',
+    model: 'local-llama.cpp',
+  },
+  'anthropic-haiku': {
+    label: 'Claude Haiku',
+    providerLabel: 'Anthropic',
+    model: 'claude-haiku-4-5-20251001',
+  },
+  'openai-gpt5mini': {
+    label: 'GPT-5 mini',
+    providerLabel: 'OpenAI',
+    model: 'gpt-5-mini',
+  },
+};
+
+type CompareLaneUi = {
+  laneId: ExtractionLaneId;
+  provider: 'local' | 'anthropic' | 'openai';
+  model: string;
+  status: 'loading' | 'ok' | 'error' | 'skipped';
+  durationMs: number | null;
+  extraction?: Extraction;
+  extractionV2?: ExtractionV2;
+  debug?: ExtractionDebug;
+  errorMessage?: string;
+};
+
+const createLoadingLane = (laneId: ExtractionLaneId): CompareLaneUi => {
+  const lane = compareLaneMeta[laneId];
+  return {
+    laneId,
+    provider:
+      laneId === 'local-llama' ? 'local' : laneId === 'anthropic-haiku' ? 'anthropic' : 'openai',
+    model: lane.model,
+    status: 'loading',
+    durationMs: null,
+  };
+};
+
+const toLaneUi = (lane: ExtractionLaneResult): CompareLaneUi => {
+  return {
+    laneId: lane.laneId,
+    provider: lane.provider,
+    model: lane.model,
+    status: lane.status,
+    durationMs: lane.durationMs,
+    ...(lane.extraction ? { extraction: lane.extraction } : {}),
+    ...(lane.extractionV2 ? { extractionV2: lane.extractionV2 } : {}),
+    ...(lane.debug ? { debug: lane.debug } : {}),
+    ...(lane.errorMessage ? { errorMessage: lane.errorMessage } : {}),
+  };
+};
+
+const CompareLaneCard = ({
+  lane,
+  sourceText,
+  viewMode,
+}: {
+  lane: CompareLaneUi;
+  sourceText: string;
+  viewMode: 'knowledge' | 'simple';
+}) => {
+  const laneLabel = compareLaneMeta[lane.laneId];
+
+  return (
+    <article
+      data-testid={`compare-lane-${lane.laneId}`}
+      style={{
+        position: 'relative',
+        minWidth: 360,
+        maxWidth: 520,
+        padding: '14px 14px 14px 42px',
+        border: '1px dotted #9aa4b2',
+        borderRadius: 10,
+        background: '#fff',
+      }}
+    >
+      <span
+        data-testid={`compare-lane-vertical-${lane.laneId}`}
+        style={{
+          position: 'absolute',
+          left: 8,
+          top: 10,
+          writingMode: 'vertical-rl',
+          transform: 'rotate(180deg)',
+          fontSize: 10,
+          letterSpacing: 0.4,
+          textTransform: 'uppercase',
+          color: '#5f6b7a',
+          opacity: 0.75,
+          pointerEvents: 'none',
+        }}
+      >
+        {laneLabel.providerLabel} {laneLabel.label}
+      </span>
+
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <strong style={{ fontSize: 13 }}>{laneLabel.label}</strong>
+        <span data-testid={`compare-lane-status-${lane.laneId}`} style={{ fontSize: 12 }}>
+          {lane.status}
+        </span>
+      </header>
+
+      <p style={{ margin: '4px 0 10px', opacity: 0.75, fontSize: 12 }}>{lane.model}</p>
+
+      {lane.status === 'loading' ? (
+        <div
+          data-testid={`compare-lane-loading-${lane.laneId}`}
+          style={{ display: 'flex', gap: 8 }}
+        >
+          <span
+            className="lane-spinner"
+            style={{
+              width: 12,
+              height: 12,
+              borderRadius: '50%',
+              border: '2px solid #d0d7de',
+              borderTopColor: '#4c6ef5',
+              animation: 'lane-spin 0.8s linear infinite',
+              marginTop: 3,
+            }}
+          />
+          <span style={{ fontSize: 13 }}>Running {laneLabel.label}...</span>
+        </div>
+      ) : null}
+
+      {lane.durationMs !== null ? (
+        <p style={{ margin: '0 0 10px', fontSize: 12, opacity: 0.75 }}>
+          Duration: {lane.durationMs} ms
+        </p>
+      ) : null}
+
+      {lane.status === 'error' || lane.status === 'skipped' ? (
+        <p data-testid={`compare-lane-message-${lane.laneId}`} style={{ margin: 0, fontSize: 13 }}>
+          {lane.errorMessage ?? 'No details.'}
+        </p>
+      ) : null}
+
+      {lane.status === 'ok' && lane.extraction && lane.extractionV2 && lane.debug ? (
+        viewMode === 'knowledge' ? (
+          <KnowledgeExtractionView
+            extractionV2={lane.extractionV2}
+            sourceText={sourceText}
+            debug={lane.debug}
+          />
+        ) : (
+          <ExtractionView extraction={lane.extraction} sourceText={sourceText} />
+        )
+      ) : null}
+    </article>
+  );
+};
+
 const ExtractPage = () => {
   const api = useApi();
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isComparing, setIsComparing] = useState(false);
+  const [compareCompleted, setCompareCompleted] = useState(0);
+  const [compareLanes, setCompareLanes] = useState<CompareLaneUi[]>([]);
   const [result, setResult] = useState<{
     extraction: Extraction;
     extractionV2: ExtractionV2;
@@ -475,6 +646,8 @@ const ExtractPage = () => {
 
   const submit = async () => {
     setIsSubmitting(true);
+    setCompareLanes([]);
+    setCompareCompleted(0);
 
     const response = await api.call('extract.run', { text });
 
@@ -492,6 +665,57 @@ const ExtractPage = () => {
       extractionV2: response.data.extractionV2,
       debug: response.data.debug,
     });
+  };
+
+  const submitCompare = async () => {
+    setIsComparing(true);
+    setResult(null);
+    setError(null);
+    setCompareCompleted(0);
+    setCompareLanes(compareLaneOrder.map((laneId) => createLoadingLane(laneId)));
+
+    const runLane = async (laneId: ExtractionLaneId) => {
+      try {
+        const response = await api.call('extract.compareLane', { text, laneId });
+        if (!response.ok) {
+          setCompareLanes((current) =>
+            current.map((lane) =>
+              lane.laneId === laneId
+                ? {
+                    ...lane,
+                    status: 'error',
+                    durationMs: 0,
+                    errorMessage: response.error.message,
+                  }
+                : lane,
+            ),
+          );
+          return;
+        }
+
+        setCompareLanes((current) =>
+          current.map((lane) => (lane.laneId === laneId ? toLaneUi(response.data.lane) : lane)),
+        );
+      } catch (laneError) {
+        setCompareLanes((current) =>
+          current.map((lane) =>
+            lane.laneId === laneId
+              ? {
+                  ...lane,
+                  status: 'error',
+                  durationMs: 0,
+                  errorMessage: laneError instanceof Error ? laneError.message : String(laneError),
+                }
+              : lane,
+          ),
+        );
+      } finally {
+        setCompareCompleted((value) => value + 1);
+      }
+    };
+
+    await Promise.allSettled(compareLaneOrder.map((laneId) => runLane(laneId)));
+    setIsComparing(false);
   };
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -523,8 +747,23 @@ const ExtractPage = () => {
           placeholder="Paste text and press Cmd+Enter to submit"
         />
 
-        <button data-testid="extract-submit-button" type="submit" disabled={isSubmitting}>
+        <button
+          data-testid="extract-submit-button"
+          type="submit"
+          disabled={isSubmitting || isComparing}
+        >
           {isSubmitting ? 'Extracting...' : 'Submit'}
+        </button>
+        <button
+          data-testid="extract-compare-button"
+          type="button"
+          onClick={() => {
+            void submitCompare();
+          }}
+          disabled={isComparing || isSubmitting}
+          style={{ marginLeft: 8 }}
+        >
+          {isComparing ? 'Running 3 models...' : 'Run A/B Compare'}
         </button>
       </form>
 
@@ -584,6 +823,38 @@ const ExtractPage = () => {
           </details>
         </>
       ) : null}
+
+      {compareLanes.length > 0 ? (
+        <section data-testid="compare-results" style={{ marginTop: 18, display: 'grid', gap: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ margin: 0, fontSize: 18 }}>Model Compare</h2>
+            <p data-testid="compare-progress" style={{ margin: 0, fontSize: 13, opacity: 0.8 }}>
+              {compareCompleted}/{compareLaneOrder.length} complete
+            </p>
+          </div>
+
+          <div
+            data-testid="compare-lanes-scroll"
+            style={{
+              display: 'flex',
+              gap: 12,
+              overflowX: 'auto',
+              paddingBottom: 8,
+            }}
+          >
+            {compareLaneOrder.map((laneId) => {
+              const lane = compareLanes.find((entry) => entry.laneId === laneId);
+              if (!lane) {
+                return null;
+              }
+
+              return (
+                <CompareLaneCard key={laneId} lane={lane} sourceText={text} viewMode={viewMode} />
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
     </section>
   );
 };
@@ -593,8 +864,17 @@ export const App = () => {
 
   return (
     <main
-      style={{ maxWidth: 900, margin: '0 auto', padding: 24, fontFamily: 'system-ui, sans-serif' }}
+      style={{ maxWidth: 1080, margin: '0 auto', padding: 24, fontFamily: 'system-ui, sans-serif' }}
     >
+      <style>
+        {`
+          @keyframes lane-spin {
+            to {
+              transform: rotate(360deg);
+            }
+          }
+        `}
+      </style>
       <nav style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
         <a href="#/" data-testid="nav-extract">
           Extract

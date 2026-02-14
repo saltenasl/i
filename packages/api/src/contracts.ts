@@ -118,6 +118,20 @@ export type ExtractionDebug = {
   errors: string[];
 };
 
+export type ExtractionLaneId = 'local-llama' | 'anthropic-haiku' | 'openai-gpt5mini';
+
+export type ExtractionLaneResult = {
+  laneId: ExtractionLaneId;
+  provider: 'local' | 'anthropic' | 'openai';
+  model: string;
+  status: 'ok' | 'error' | 'skipped';
+  durationMs: number;
+  extraction?: Extraction;
+  extractionV2?: ExtractionV2;
+  debug?: ExtractionDebug;
+  errorMessage?: string;
+};
+
 export interface ApiMethodMap {
   'health.ping': {
     input: Record<string, never>;
@@ -142,6 +156,19 @@ export interface ApiMethodMap {
       { extraction: Extraction; extractionV2: ExtractionV2; debug: ExtractionDebug },
       AppErrorCode
     >;
+  };
+  'extract.compareLane': {
+    input: {
+      text: string;
+      laneId: ExtractionLaneId;
+    };
+    output: Result<{ lane: ExtractionLaneResult }, AppErrorCode>;
+  };
+  'extract.compare': {
+    input: {
+      text: string;
+    };
+    output: Result<{ lanes: ExtractionLaneResult[] }, AppErrorCode>;
   };
 }
 

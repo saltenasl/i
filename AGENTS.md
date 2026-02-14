@@ -58,6 +58,7 @@
 3. Improve renderer extraction UX: highlighted source text, entity excerpts, fact ownership/perspective clarity, segment cards, debug-copy workflow.
 4. Maintain deterministic verification coverage (backend + RTL + E2E smoke) without brittle model-output assertions in E2E.
 5. Prepare next persistence phase by keeping `extractionV2` graph projection and segment metadata stable for DB storage.
+6. Add side-by-side extraction A/B benchmarking lanes (local llama + Claude + OpenAI) with additive API contracts and explicit loading/progress UX.
 
 ## Decision Log
 - Chosen stack: pnpm workspace, electron-vite, Vite React, Vitest, Playwright Electron, Biome.
@@ -87,6 +88,7 @@
 - E2E extraction convention: keep E2E assertions at smoke level for extraction UI controls (textarea + submit, fresh + seeded profiles), not model-inference content assertions.
 - Runtime constraint convention: extraction must use local llama.cpp + local GGUF only (no Python), with first-call auto-download into `~/.auto-extract`.
 - Latency target convention: optimize extraction for practical local responsiveness with a working target around <=2s on supported hardware/model, while prioritizing correctness and grounding over unrealistic token-speed assumptions.
+- A/B benchmarking convention: extraction compare mode may call cloud providers via AI SDK (Anthropic + OpenAI) in parallel with local llama for side-by-side evaluation, while preserving the existing local-only `extract.run` path for compatibility.
 
 ## Convention Intake Process
 When a new user convention appears:

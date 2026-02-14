@@ -1,4 +1,4 @@
-export const buildPromptV2 = (text: string): string => {
+export const buildSystemPromptV2 = (): string => {
   return [
     'Extract structured note intelligence from the full note. Return exactly one JSON object and nothing else.',
     'First output char must be { and last output char must be }.',
@@ -16,8 +16,13 @@ export const buildPromptV2 = (text: string): string => {
     '- Actions/emotions should be represented in fact evidence spans, not inside entity names.',
     '- Use concise values.',
     '- title must be <= 25 characters.',
-    '',
-    'Input:',
-    text,
   ].join('\n');
+};
+
+export const buildUserPromptV2 = (text: string): string => {
+  return ['Input:', text].join('\n');
+};
+
+export const buildPromptV2 = (text: string): string => {
+  return [buildSystemPromptV2(), '', buildUserPromptV2(text)].join('\n');
 };

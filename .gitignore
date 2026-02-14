@@ -16,3 +16,5 @@ packages/*/dist
 .npm-cache
 .pnpm-store
 .local
+.env
+.env.local

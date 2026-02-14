@@ -1,8 +1,11 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import net from 'node:net';
 import os from 'node:os';
+import { anthropic } from '@ai-sdk/anthropic';
+import { openai } from '@ai-sdk/openai';
+import { generateText } from 'ai';
 import { ensureAssets } from './assets.js';
-import { buildPromptV2 } from './prompt.js';
+import { buildPromptV2, buildSystemPromptV2, buildUserPromptV2 } from './prompt.js';
 import type {
   EntityType,
   Extraction,
@@ -13,10 +16,28 @@ import type {
 } from './types.js';
 import { parseAndValidateExtractionV2Output } from './validate.js';
 
-const FAST_OUTPUT_TOKENS = 220;
+const FAST_OUTPUT_TOKENS = 400;
+const CLOUD_OUTPUT_TOKENS = 2_000;
 const SERVER_READY_TIMEOUT_MS = 45_000;
 const SERVER_REQUEST_TIMEOUT_MS = 20_000;
+const CLOUD_REQUEST_TIMEOUT_MS = 30_000;
 const SEGMENT_GAP_CHARS = 80;
+const ANTHROPIC_HAIKU_MODEL = 'claude-haiku-4-5-20251001';
+const OPENAI_GPT5_MINI_MODEL = 'gpt-5-mini';
+
+export type ExtractionLaneId = 'local-llama' | 'anthropic-haiku' | 'openai-gpt5mini';
+
+export type ExtractionLaneResult = {
+  laneId: ExtractionLaneId;
+  provider: 'local' | 'anthropic' | 'openai';
+  model: string;
+  status: 'ok' | 'error' | 'skipped';
+  durationMs: number;
+  extraction?: Extraction;
+  extractionV2?: ExtractionV2;
+  debug?: ExtractionDebug;
+  errorMessage?: string;
+};
 
 type Span = { start: number; end: number };
 
@@ -25,6 +46,12 @@ type LlamaServerRuntime = {
   child: ChildProcess;
   mode: 'metal' | 'cpu';
   modelPath: string;
+};
+
+type ExtractionBundle = {
+  extraction: Extraction;
+  extractionV2: ExtractionV2;
+  debug: ExtractionDebug;
 };
 
 let assetsPromise: ReturnType<typeof ensureAssets> | undefined;
@@ -280,6 +307,59 @@ const runLlamaCompletion = async (prompt: string, nPredict: number): Promise<str
   } finally {
     clearTimeout(timeout);
   }
+};
+
+const withTimeout = async <T>(
+  operation: Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> => {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([operation, timeoutPromise]);
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+  }
+};
+
+const finalizeExtractionBundle = (
+  text: string,
+  prompt: string,
+  rawModelOutput: string,
+  validated: ExtractionV2,
+  startedAt: number,
+  runtime: ExtractionDebug['runtime'],
+  fallbackUsed: boolean,
+  errors: string[],
+): ExtractionBundle => {
+  const segmented = deriveSegments(validated, text);
+  const extractionV2 = segmented.extraction;
+  const extraction = toExtractionV1(extractionV2, text);
+
+  const debug: ExtractionDebug = {
+    inputText: text,
+    prompt,
+    rawModelOutput,
+    validatedExtractionV2BeforeSegmentation: validated,
+    finalExtractionV2: extractionV2,
+    finalExtractionV1: extraction,
+    segmentationTrace: segmented.trace,
+    runtime: {
+      ...runtime,
+      totalMs: Date.now() - startedAt,
+    },
+    fallbackUsed,
+    errors,
+  };
+
+  return { extraction, extractionV2, debug };
 };
 
 const findSpan = (text: string, value: string): Span | null => {
@@ -769,6 +849,90 @@ const buildFallbackExtractionV2 = (text: string): ExtractionV2 => {
   return deriveSegments(ensureSelfOwnership(raw, text), text).extraction;
 };
 
+const laneMeta: Record<
+  ExtractionLaneId,
+  { provider: ExtractionLaneResult['provider']; model: string; envKey?: string }
+> = {
+  'local-llama': {
+    provider: 'local',
+    model: 'local-llama.cpp',
+  },
+  'anthropic-haiku': {
+    provider: 'anthropic',
+    model: ANTHROPIC_HAIKU_MODEL,
+    envKey: 'ANTHROPIC_API_KEY',
+  },
+  'openai-gpt5mini': {
+    provider: 'openai',
+    model: OPENAI_GPT5_MINI_MODEL,
+    envKey: 'OPENAI_API_KEY',
+  },
+};
+
+const runCloudExtractionBundle = async (
+  text: string,
+  laneId: 'anthropic-haiku' | 'openai-gpt5mini',
+): Promise<ExtractionBundle> => {
+  const startedAt = Date.now();
+  const prompt = buildUserPromptV2(text);
+  const system = buildSystemPromptV2();
+  const errors: string[] = [];
+  let rawModelOutput = '';
+  let fallbackUsed = false;
+
+  let validated = buildFallbackExtractionV2(text);
+
+  try {
+    const model =
+      laneId === 'anthropic-haiku'
+        ? anthropic(ANTHROPIC_HAIKU_MODEL)
+        : openai(OPENAI_GPT5_MINI_MODEL);
+
+    const completion = await withTimeout(
+      generateText({
+        model,
+        system,
+        prompt,
+        temperature: 0,
+        maxOutputTokens: CLOUD_OUTPUT_TOKENS,
+      }),
+      CLOUD_REQUEST_TIMEOUT_MS,
+      `Timed out waiting for ${laneId} extraction response.`,
+    );
+
+    rawModelOutput = completion.text;
+    const parsed = parseAndValidateExtractionV2Output(text, rawModelOutput);
+    validated = ensureSelfOwnership(parsed, text);
+
+    if (validated.entities.length === 0 && validated.facts.length === 0) {
+      fallbackUsed = true;
+      validated = buildFallbackExtractionV2(text);
+      errors.push('Model output had no entities/facts.');
+    }
+  } catch (error) {
+    fallbackUsed = true;
+    errors.push(error instanceof Error ? error.message : String(error));
+    validated = buildFallbackExtractionV2(text);
+  }
+
+  const meta = laneMeta[laneId];
+  return finalizeExtractionBundle(
+    text,
+    [system, '', prompt].join('\n'),
+    rawModelOutput,
+    validated,
+    startedAt,
+    {
+      modelPath: `${meta.provider}:${meta.model}`,
+      serverMode: 'cpu',
+      nPredict: CLOUD_OUTPUT_TOKENS,
+      totalMs: 0,
+    },
+    fallbackUsed,
+    errors,
+  );
+};
+
 export const toExtractionV1 = (extractionV2: ExtractionV2, text: string): Extraction => {
   const items: Extraction['items'] = [];
   const itemByFactId = new Map<string, number>();
@@ -877,29 +1041,92 @@ export async function extractWithDebug(text: string): Promise<{
     validated = buildFallbackExtractionV2(text);
   }
 
-  const segmented = deriveSegments(validated, text);
-  const extractionV2 = segmented.extraction;
-  const extraction = toExtractionV1(extractionV2, text);
-
-  const debug: ExtractionDebug = {
-    inputText: text,
+  return finalizeExtractionBundle(
+    text,
     prompt,
     rawModelOutput,
-    validatedExtractionV2BeforeSegmentation: validated,
-    finalExtractionV2: extractionV2,
-    finalExtractionV1: extraction,
-    segmentationTrace: segmented.trace,
-    runtime: {
+    validated,
+    startedAt,
+    {
       modelPath: runtime.modelPath,
       serverMode: runtime.mode,
       nPredict: FAST_OUTPUT_TOKENS,
-      totalMs: Date.now() - startedAt,
+      totalMs: 0,
     },
     fallbackUsed,
     errors,
-  };
+  );
+}
 
-  return { extraction, extractionV2, debug };
+export async function extractCompareLane(
+  text: string,
+  laneId: ExtractionLaneId,
+): Promise<ExtractionLaneResult> {
+  if (typeof text !== 'string' || text.length === 0) {
+    throw new Error('extractCompareLane(text) requires a non-empty text string.');
+  }
+
+  const lane = laneMeta[laneId];
+  const startedAt = Date.now();
+
+  if (!lane) {
+    return {
+      laneId,
+      provider: 'local',
+      model: 'unknown',
+      status: 'error',
+      durationMs: Date.now() - startedAt,
+      errorMessage: `Unknown lane: ${laneId}`,
+    };
+  }
+
+  if (lane.envKey && !process.env[lane.envKey]) {
+    return {
+      laneId,
+      provider: lane.provider,
+      model: lane.model,
+      status: 'skipped',
+      durationMs: Date.now() - startedAt,
+      errorMessage: `Missing ${lane.envKey} environment variable.`,
+    };
+  }
+
+  try {
+    const bundle =
+      laneId === 'local-llama'
+        ? await extractWithDebug(text)
+        : await runCloudExtractionBundle(text, laneId);
+
+    return {
+      laneId,
+      provider: lane.provider,
+      model: lane.model,
+      status: 'ok',
+      durationMs: Date.now() - startedAt,
+      extraction: bundle.extraction,
+      extractionV2: bundle.extractionV2,
+      debug: bundle.debug,
+    };
+  } catch (error) {
+    return {
+      laneId,
+      provider: lane.provider,
+      model: lane.model,
+      status: 'error',
+      durationMs: Date.now() - startedAt,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export async function extractCompare(text: string): Promise<{ lanes: ExtractionLaneResult[] }> {
+  if (typeof text !== 'string' || text.length === 0) {
+    throw new Error('extractCompare(text) requires a non-empty text string.');
+  }
+
+  const laneOrder: ExtractionLaneId[] = ['local-llama', 'anthropic-haiku', 'openai-gpt5mini'];
+  const lanes = await Promise.all(laneOrder.map((laneId) => extractCompareLane(text, laneId)));
+  return { lanes };
 }
 
 export async function extractV2(text: string): Promise<ExtractionV2> {

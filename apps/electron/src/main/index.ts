@@ -2,11 +2,16 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createBackendHandlers } from '@repo/backend';
 import { type SeedProfile, closeDb, initializeRuntimeDatabase } from '@repo/db';
+import { config as loadDotenv } from 'dotenv';
 import { BrowserWindow, app } from 'electron';
 import { registerIpcApiHandlers } from './ipc.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Load optional project-local env files for desktop runtime secrets/config.
+loadDotenv({ path: path.resolve(process.cwd(), '.env') });
+loadDotenv({ path: path.resolve(process.cwd(), '.env.local'), override: true });
 
 let mainWindow: BrowserWindow | null = null;
 let closeDatabase: (() => Promise<void>) | null = null;

@@ -215,4 +215,144 @@ describe('createBackendHandlers', () => {
     expect(result.data.extractionV2.entities[0]?.name).toBe('llama.cpp');
     expect(result.data.debug.runtime.serverMode).toBe('cpu');
   });
+
+  it('runs compare lane through injected lane dependency', async () => {
+    if (!harness) {
+      throw new Error('DB harness was not initialized.');
+    }
+
+    const handlers = createBackendHandlers({
+      db: harness.db,
+      runExtractionCompareLane: async (text, laneId) => ({
+        laneId,
+        provider:
+          laneId === 'local-llama'
+            ? 'local'
+            : laneId === 'anthropic-haiku'
+              ? 'anthropic'
+              : 'openai',
+        model: laneId,
+        status: 'ok',
+        durationMs: 5,
+        extraction: { title: text.slice(0, 10), items: [], groups: [] },
+        extractionV2: {
+          title: 'Lane',
+          noteType: 'personal',
+          summary: 'Summary',
+          language: 'en',
+          date: null,
+          sentiment: 'neutral',
+          emotions: [],
+          entities: [],
+          facts: [],
+          relations: [],
+          groups: [],
+          segments: [],
+        },
+        debug: {
+          inputText: text,
+          prompt: 'prompt',
+          rawModelOutput: '{}',
+          validatedExtractionV2BeforeSegmentation: {
+            title: 'Lane',
+            noteType: 'personal',
+            summary: 'Summary',
+            language: 'en',
+            date: null,
+            sentiment: 'neutral',
+            emotions: [],
+            entities: [],
+            facts: [],
+            relations: [],
+            groups: [],
+            segments: [],
+          },
+          finalExtractionV2: {
+            title: 'Lane',
+            noteType: 'personal',
+            summary: 'Summary',
+            language: 'en',
+            date: null,
+            sentiment: 'neutral',
+            emotions: [],
+            entities: [],
+            facts: [],
+            relations: [],
+            groups: [],
+            segments: [],
+          },
+          finalExtractionV1: { title: 'Lane', items: [], groups: [] },
+          segmentationTrace: [],
+          runtime: {
+            modelPath: 'lane',
+            serverMode: 'cpu',
+            nPredict: 220,
+            totalMs: 5,
+          },
+          fallbackUsed: false,
+          errors: [],
+        },
+      }),
+    });
+
+    const result = await handlers['extract.compareLane']({
+      text: 'Compare this text',
+      laneId: 'openai-gpt5mini',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.data.lane.laneId).toBe('openai-gpt5mini');
+    expect(result.data.lane.status).toBe('ok');
+  });
+
+  it('runs compare through injected compare dependency', async () => {
+    if (!harness) {
+      throw new Error('DB harness was not initialized.');
+    }
+
+    const handlers = createBackendHandlers({
+      db: harness.db,
+      runExtractionCompare: async () => ({
+        lanes: [
+          {
+            laneId: 'local-llama',
+            provider: 'local',
+            model: 'local-llama.cpp',
+            status: 'ok',
+            durationMs: 10,
+          },
+          {
+            laneId: 'anthropic-haiku',
+            provider: 'anthropic',
+            model: 'claude-haiku-4-5-20251001',
+            status: 'skipped',
+            durationMs: 1,
+            errorMessage: 'Missing key',
+          },
+          {
+            laneId: 'openai-gpt5mini',
+            provider: 'openai',
+            model: 'gpt-5-mini',
+            status: 'error',
+            durationMs: 2,
+            errorMessage: 'Upstream error',
+          },
+        ],
+      }),
+    });
+
+    const result = await handlers['extract.compare']({ text: 'Compare all lanes' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.data.lanes).toHaveLength(3);
+    expect(result.data.lanes[1]?.status).toBe('skipped');
+    expect(result.data.lanes[2]?.status).toBe('error');
+  });
 });

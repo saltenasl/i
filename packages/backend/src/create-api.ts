@@ -3,11 +3,13 @@ import {
   type ApiInput,
   type Extraction,
   type ExtractionDebug,
+  type ExtractionLaneId,
+  type ExtractionLaneResult,
   type ExtractionV2,
   err,
   ok,
 } from '@repo/api';
-import { extractWithDebug } from '@repo/auto-extract';
+import { extractCompare, extractCompareLane, extractWithDebug } from '@repo/auto-extract';
 import type { DbClient } from '@repo/db';
 import { createNoteService, listNotesService } from './services/note-service.js';
 
@@ -18,6 +20,11 @@ export interface BackendDependencies {
     extraction: Extraction;
     debug: ExtractionDebug;
   }>;
+  runExtractionCompareLane?: (
+    text: string,
+    laneId: ExtractionLaneId,
+  ) => Promise<ExtractionLaneResult>;
+  runExtractionCompare?: (text: string) => Promise<{ lanes: ExtractionLaneResult[] }>;
 }
 
 export const createBackendHandlers = (deps: BackendDependencies): ApiHandlers => ({
@@ -52,6 +59,36 @@ export const createBackendHandlers = (deps: BackendDependencies): ApiHandlers =>
       return ok(bundle);
     } catch (error) {
       return err('INTERNAL_ERROR', 'Failed to extract text.', {
+        cause: error instanceof Error ? error.message : String(error),
+      });
+    }
+  },
+  'extract.compareLane': async (input: ApiInput<'extract.compareLane'>) => {
+    const text = input.text.trim();
+    if (!text) {
+      return err('VALIDATION_ERROR', 'Text must not be empty.');
+    }
+
+    try {
+      const lane = await (deps.runExtractionCompareLane ?? extractCompareLane)(text, input.laneId);
+      return ok({ lane });
+    } catch (error) {
+      return err('INTERNAL_ERROR', 'Failed to compare extraction lane.', {
+        cause: error instanceof Error ? error.message : String(error),
+      });
+    }
+  },
+  'extract.compare': async (input: ApiInput<'extract.compare'>) => {
+    const text = input.text.trim();
+    if (!text) {
+      return err('VALIDATION_ERROR', 'Text must not be empty.');
+    }
+
+    try {
+      const lanes = await (deps.runExtractionCompare ?? extractCompare)(text);
+      return ok(lanes);
+    } catch (error) {
+      return err('INTERNAL_ERROR', 'Failed to compare extraction.', {
         cause: error instanceof Error ? error.message : String(error),
       });
     }
