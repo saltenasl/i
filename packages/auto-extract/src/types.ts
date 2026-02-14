@@ -14,8 +14,9 @@ export type Extraction = {
   }>;
 };
 
-export type NoteSentiment = 'positive' | 'negative' | 'neutral' | 'mixed';
+export type NoteSentiment = 'positive' | 'negative' | 'neutral' | 'varied';
 export type EntityType = 'person' | 'org' | 'tool' | 'place' | 'concept' | 'event';
+export type FactPerspective = 'self' | 'other' | 'uncertain';
 
 export type ExtractionV2 = {
   title: string;
@@ -41,6 +42,9 @@ export type ExtractionV2 = {
   }>;
   facts: Array<{
     id: string;
+    ownerEntityId: string;
+    perspective: FactPerspective;
+    segmentId?: string;
     subjectEntityId?: string;
     predicate: string;
     objectEntityId?: string;
@@ -62,4 +66,37 @@ export type ExtractionV2 = {
     entityIds: string[];
     factIds: string[];
   }>;
+  segments: Array<{
+    id: string;
+    start: number;
+    end: number;
+    sentiment: NoteSentiment;
+    summary: string;
+    entityIds: string[];
+    factIds: string[];
+    relationIndexes: number[];
+  }>;
+};
+
+export type ExtractionDebug = {
+  inputText: string;
+  prompt: string;
+  rawModelOutput: string;
+  validatedExtractionV2BeforeSegmentation: ExtractionV2;
+  finalExtractionV2: ExtractionV2;
+  finalExtractionV1: Extraction;
+  segmentationTrace: Array<{
+    segmentId: string;
+    start: number;
+    end: number;
+    reason: string;
+  }>;
+  runtime: {
+    modelPath: string;
+    serverMode: 'metal' | 'cpu';
+    nPredict: number;
+    totalMs: number;
+  };
+  fallbackUsed: boolean;
+  errors: string[];
 };

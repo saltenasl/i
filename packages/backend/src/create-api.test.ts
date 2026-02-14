@@ -99,36 +99,108 @@ describe('createBackendHandlers', () => {
 
     const handlers = createBackendHandlers({
       db: harness.db,
-      runExtractionV2: async (text) => ({
-        title: 'Extracted',
-        noteType: 'reference',
-        summary: 'Uses local llama runtime.',
-        language: 'en',
-        date: null,
-        sentiment: 'neutral',
-        emotions: [],
-        entities: [
-          {
-            id: 'ent_1',
-            name: 'llama.cpp',
-            type: 'tool',
-            nameStart: text.indexOf('llama.cpp'),
-            nameEnd: text.indexOf('llama.cpp') + 'llama.cpp'.length,
-            confidence: 0.91,
+      runExtractionBundle: async (text) => ({
+        extraction: {
+          title: 'Extracted',
+          items: [
+            {
+              label: 'tool',
+              value: 'llama.cpp',
+              start: text.indexOf('llama.cpp'),
+              end: text.indexOf('llama.cpp') + 'llama.cpp'.length,
+              confidence: 0.9,
+            },
+          ],
+          groups: [{ name: 'tools', itemIndexes: [0] }],
+        },
+        extractionV2: {
+          title: 'Extracted',
+          noteType: 'reference',
+          summary: 'Uses local llama runtime.',
+          language: 'en',
+          date: null,
+          sentiment: 'neutral',
+          emotions: [],
+          entities: [
+            {
+              id: 'ent_1',
+              name: 'llama.cpp',
+              type: 'tool',
+              nameStart: text.indexOf('llama.cpp'),
+              nameEnd: text.indexOf('llama.cpp') + 'llama.cpp'.length,
+              confidence: 0.91,
+            },
+          ],
+          facts: [
+            {
+              id: 'fact_1',
+              ownerEntityId: 'ent_1',
+              perspective: 'other',
+              subjectEntityId: 'ent_1',
+              predicate: 'used_for_extraction',
+              evidenceStart: text.indexOf('llama.cpp'),
+              evidenceEnd: text.indexOf('llama.cpp') + 'llama.cpp'.length,
+              confidence: 0.9,
+            },
+          ],
+          relations: [],
+          groups: [{ name: 'tools', entityIds: ['ent_1'], factIds: ['fact_1'] }],
+          segments: [
+            {
+              id: 'seg_1',
+              start: 0,
+              end: text.length,
+              sentiment: 'neutral',
+              summary: 'Uses local llama runtime.',
+              entityIds: ['ent_1'],
+              factIds: ['fact_1'],
+              relationIndexes: [],
+            },
+          ],
+        },
+        debug: {
+          inputText: text,
+          prompt: 'prompt',
+          rawModelOutput: '{}',
+          validatedExtractionV2BeforeSegmentation: {
+            title: 'Extracted',
+            noteType: 'reference',
+            summary: 'Uses local llama runtime.',
+            language: 'en',
+            date: null,
+            sentiment: 'neutral',
+            emotions: [],
+            entities: [],
+            facts: [],
+            relations: [],
+            groups: [],
+            segments: [],
           },
-        ],
-        facts: [
-          {
-            id: 'fact_1',
-            subjectEntityId: 'ent_1',
-            predicate: 'used_for_extraction',
-            evidenceStart: text.indexOf('llama.cpp'),
-            evidenceEnd: text.indexOf('llama.cpp') + 'llama.cpp'.length,
-            confidence: 0.9,
+          finalExtractionV2: {
+            title: 'Extracted',
+            noteType: 'reference',
+            summary: 'Uses local llama runtime.',
+            language: 'en',
+            date: null,
+            sentiment: 'neutral',
+            emotions: [],
+            entities: [],
+            facts: [],
+            relations: [],
+            groups: [],
+            segments: [],
           },
-        ],
-        relations: [],
-        groups: [{ name: 'tools', entityIds: ['ent_1'], factIds: ['fact_1'] }],
+          finalExtractionV1: { title: 'Extracted', items: [], groups: [] },
+          segmentationTrace: [],
+          runtime: {
+            modelPath: '/tmp/model.gguf',
+            serverMode: 'cpu',
+            nPredict: 220,
+            totalMs: 10,
+          },
+          fallbackUsed: false,
+          errors: [],
+        },
       }),
     });
 
@@ -141,5 +213,6 @@ describe('createBackendHandlers', () => {
     expect(result.data.extraction.title).toBe('Extracted');
     expect(result.data.extraction.items[0]?.value).toBe('llama.cpp');
     expect(result.data.extractionV2.entities[0]?.name).toBe('llama.cpp');
+    expect(result.data.debug.runtime.serverMode).toBe('cpu');
   });
 });

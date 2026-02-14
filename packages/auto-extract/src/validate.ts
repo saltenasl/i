@@ -1,4 +1,10 @@
-import type { EntityType, Extraction, ExtractionV2, NoteSentiment } from './types.js';
+import type {
+  EntityType,
+  Extraction,
+  ExtractionV2,
+  FactPerspective,
+  NoteSentiment,
+} from './types.js';
 
 type RequiredMention = {
   start: number;
@@ -24,7 +30,8 @@ const TAXONOMY = [
 
 type TaxonomyName = (typeof TAXONOMY)[number];
 
-const sentimentValues: NoteSentiment[] = ['positive', 'negative', 'neutral', 'mixed'];
+const sentimentValues: NoteSentiment[] = ['positive', 'negative', 'neutral', 'varied'];
+const perspectiveValues: FactPerspective[] = ['self', 'other', 'uncertain'];
 const entityTypeValues: EntityType[] = ['person', 'org', 'tool', 'place', 'concept', 'event'];
 
 const isObject = (value: unknown): value is Record<string, unknown> => {
@@ -509,6 +516,16 @@ export const normalizeGroupsV2 = (extraction: ExtractionV2): ExtractionV2['group
   });
 };
 
+const normalizeSentiment = (value: string): NoteSentiment => {
+  if (value === 'mixed') {
+    return 'varied';
+  }
+  if (!sentimentValues.includes(value as NoteSentiment)) {
+    return 'neutral';
+  }
+  return value as NoteSentiment;
+};
+
 export const validateExtractionV2 = (text: string, raw: unknown): ExtractionV2 => {
   if (!isObject(raw)) {
     throw new Error('ExtractionV2 must be an object.');
@@ -527,10 +544,7 @@ export const validateExtractionV2 = (text: string, raw: unknown): ExtractionV2 =
   const date = dateRaw === null ? null : (parseOptionalString(dateRaw, 'date') ?? null);
 
   const sentimentRaw = parseString(raw.sentiment, 'sentiment');
-  if (!sentimentValues.includes(sentimentRaw as NoteSentiment)) {
-    throw new Error('sentiment is invalid.');
-  }
-  const sentiment = sentimentRaw as NoteSentiment;
+  const sentiment = normalizeSentiment(sentimentRaw);
 
   const emotionsRaw = raw.emotions;
   if (!Array.isArray(emotionsRaw)) {
@@ -652,6 +666,12 @@ export const validateExtractionV2 = (text: string, raw: unknown): ExtractionV2 =
       return [];
     }
 
+    const ownerEntityIdRaw = parseOptionalString(
+      factRaw.ownerEntityId,
+      `facts[${index}].ownerEntityId`,
+    );
+    const perspectiveRaw = parseOptionalString(factRaw.perspective, `facts[${index}].perspective`);
+
     const subjectEntityIdRaw = parseOptionalString(
       factRaw.subjectEntityId,
       `facts[${index}].subjectEntityId`,
@@ -661,15 +681,31 @@ export const validateExtractionV2 = (text: string, raw: unknown): ExtractionV2 =
       `facts[${index}].objectEntityId`,
     );
     const objectText = parseOptionalString(factRaw.objectText, `facts[${index}].objectText`);
+    const segmentId = parseOptionalString(factRaw.segmentId, `facts[${index}].segmentId`);
 
     const subjectEntityId =
       subjectEntityIdRaw && entityIdSet.has(subjectEntityIdRaw) ? subjectEntityIdRaw : undefined;
     const objectEntityId =
       objectEntityIdRaw && entityIdSet.has(objectEntityIdRaw) ? objectEntityIdRaw : undefined;
 
+    const ownerEntityId =
+      ownerEntityIdRaw && entityIdSet.has(ownerEntityIdRaw) ? ownerEntityIdRaw : subjectEntityId;
+
+    const perspective =
+      perspectiveRaw && perspectiveValues.includes(perspectiveRaw as FactPerspective)
+        ? (perspectiveRaw as FactPerspective)
+        : 'uncertain';
+
+    if (!ownerEntityId) {
+      return [];
+    }
+
     return [
       {
         id,
+        ownerEntityId,
+        perspective,
+        ...(segmentId ? { segmentId } : {}),
         predicate,
         ...(subjectEntityId ? { subjectEntityId } : {}),
         ...(objectEntityId ? { objectEntityId } : {}),
@@ -777,6 +813,79 @@ export const validateExtractionV2 = (text: string, raw: unknown): ExtractionV2 =
       })
     : [];
 
+  const rawSegments = Array.isArray(raw.segments)
+    ? raw.segments.flatMap((segmentRaw, index) => {
+        if (!isObject(segmentRaw)) {
+          return [];
+        }
+
+        const id = parseString(segmentRaw.id, `segments[${index}].id`);
+        const start = parseNumber(segmentRaw.start, `segments[${index}].start`);
+        const end = parseNumber(segmentRaw.end, `segments[${index}].end`);
+        const summary = parseString(segmentRaw.summary, `segments[${index}].summary`);
+        const sentimentValue = normalizeSentiment(
+          parseString(segmentRaw.sentiment, `segments[${index}].sentiment`),
+        );
+
+        if (
+          !Number.isInteger(start) ||
+          !Number.isInteger(end) ||
+          start < 0 ||
+          end <= start ||
+          end > text.length
+        ) {
+          return [];
+        }
+
+        const entityIdsRaw = segmentRaw.entityIds;
+        const factIdsRaw = segmentRaw.factIds;
+        const relationIndexesRaw = segmentRaw.relationIndexes;
+
+        if (
+          !Array.isArray(entityIdsRaw) ||
+          !Array.isArray(factIdsRaw) ||
+          !Array.isArray(relationIndexesRaw)
+        ) {
+          return [];
+        }
+
+        const entityIds = entityIdsRaw.flatMap((entityIdRaw) => {
+          if (typeof entityIdRaw !== 'string' || !entityIdSet.has(entityIdRaw)) {
+            return [];
+          }
+          return [entityIdRaw];
+        });
+
+        const factIds = factIdsRaw.flatMap((factIdRaw) => {
+          if (typeof factIdRaw !== 'string' || !factIdSet.has(factIdRaw)) {
+            return [];
+          }
+          return [factIdRaw];
+        });
+
+        const relationIndexes = relationIndexesRaw.flatMap((value, relationIndex) => {
+          const parsed = parseNumber(value, `segments[${index}].relationIndexes[${relationIndex}]`);
+          if (!Number.isInteger(parsed) || parsed < 0 || parsed >= relations.length) {
+            return [];
+          }
+          return [parsed];
+        });
+
+        return [
+          {
+            id,
+            start,
+            end,
+            summary,
+            sentiment: sentimentValue,
+            entityIds,
+            factIds,
+            relationIndexes,
+          },
+        ];
+      })
+    : [];
+
   const extraction: ExtractionV2 = {
     title,
     noteType,
@@ -789,6 +898,7 @@ export const validateExtractionV2 = (text: string, raw: unknown): ExtractionV2 =
     facts,
     relations,
     groups: rawGroups,
+    segments: rawSegments,
   };
 
   return {
