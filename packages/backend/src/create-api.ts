@@ -11,6 +11,7 @@ import {
 import { extractCompare, extractCompareLane, extractWithDebug } from '@repo/auto-extract';
 import type { DbClient } from '@repo/db';
 import {
+  getExtractionHistoryService,
   listExtractionHistoryService,
   persistExtractionHistoryService,
 } from './services/extraction-history-service.js';
@@ -75,6 +76,15 @@ export const createBackendHandlers = (deps: BackendDependencies): ApiHandlers =>
       return await listExtractionHistoryService(deps.db, input);
     } catch (error) {
       return err('DB_ERROR', 'Failed to list extraction history.', {
+        cause: error instanceof Error ? error.message : String(error),
+      });
+    }
+  },
+  'extract.history.get': async (input: ApiInput<'extract.history.get'>) => {
+    try {
+      return await getExtractionHistoryService(deps.db, input);
+    } catch (error) {
+      return err('DB_ERROR', 'Failed to get extraction history entry.', {
         cause: error instanceof Error ? error.message : String(error),
       });
     }

@@ -165,6 +165,12 @@ export interface ApiMethodMap {
     };
     output: Result<{ lanes: ExtractionLaneResult[] }, AppErrorCode>;
   };
+  'extract.history.get': {
+    input: {
+      id: string;
+    };
+    output: Result<{ entry: ExtractionHistoryEntryDto }, AppErrorCode>;
+  };
 }
 
 export type ApiMethodName = keyof ApiMethodMap;

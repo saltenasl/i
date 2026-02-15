@@ -1,8 +1,9 @@
 import type { ExtractionDebug, ExtractionLaneResult, ExtractionV2 } from '@repo/api';
-import { type ApiMethodMap, ok } from '@repo/api';
+import { type ApiMethodMap, err, ok } from '@repo/api';
 import type { DbClient } from '@repo/db';
 import {
   createExtractionHistoryEntry,
+  getExtractionHistoryById,
   listExtractionHistory,
 } from '../data-access/extraction-history-repository.js';
 
@@ -27,6 +28,17 @@ export const listExtractionHistoryService = async (
 ): Promise<ApiMethodMap['extract.history.list']['output']> => {
   const entries = await listExtractionHistory(db, normalizeLimit(input.limit));
   return ok({ entries });
+};
+
+export const getExtractionHistoryService = async (
+  db: DbClient,
+  input: ApiMethodMap['extract.history.get']['input'],
+): Promise<ApiMethodMap['extract.history.get']['output']> => {
+  const entry = await getExtractionHistoryById(db, input.id);
+  if (!entry) {
+    return err('NOT_FOUND', `Extraction history entry not found: ${input.id}`);
+  }
+  return ok({ entry });
 };
 
 export interface PersistExtractionHistoryInput {

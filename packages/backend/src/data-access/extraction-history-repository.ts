@@ -74,6 +74,23 @@ export const createExtractionHistoryEntry = async (
   return mapExtractionHistoryRow(row);
 };
 
+export const getExtractionHistoryById = async (
+  db: DbClient,
+  id: string,
+): Promise<ExtractionHistoryEntryDto | null> => {
+  const row = await db
+    .selectFrom('extraction_history')
+    .selectAll()
+    .where('id', '=', id)
+    .executeTakeFirst();
+
+  if (!row) {
+    return null;
+  }
+
+  return mapExtractionHistoryRow(row);
+};
+
 export const listExtractionHistory = async (
   db: DbClient,
   limit: number,
