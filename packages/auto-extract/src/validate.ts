@@ -47,6 +47,141 @@ const parseOptionalString = (value: unknown, label: string): string | undefined 
   return parseString(value, label);
 };
 
+const parseJsonCandidate = (value: unknown): unknown => {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+    return value;
+  }
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return value;
+  }
+};
+
+const coerceFiniteNumber = (value: unknown): unknown => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return value;
+  }
+
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : value;
+};
+
+const toArray = (value: unknown): unknown[] => {
+  const parsed = parseJsonCandidate(value);
+
+  if (Array.isArray(parsed)) {
+    return parsed;
+  }
+
+  if (isObject(parsed)) {
+    return Object.values(parsed);
+  }
+
+  return [];
+};
+
+const toStringArray = (value: unknown): string[] => {
+  return toArray(value).flatMap((entry) => {
+    if (typeof entry === 'string') {
+      return [entry];
+    }
+    return [];
+  });
+};
+
+const toNumberArray = (value: unknown): number[] => {
+  return toArray(value).flatMap((entry) => {
+    const numeric = coerceFiniteNumber(entry);
+    if (typeof numeric === 'number' && Number.isFinite(numeric)) {
+      return [numeric];
+    }
+    return [];
+  });
+};
+
+const normalizeObjectWithNumericKeys = (value: unknown, keys: string[]): unknown => {
+  const parsed = parseJsonCandidate(value);
+  if (!isObject(parsed)) {
+    return parsed;
+  }
+
+  const normalized: Record<string, unknown> = { ...parsed };
+  for (const key of keys) {
+    if (key in normalized) {
+      normalized[key] = coerceFiniteNumber(normalized[key]);
+    }
+  }
+  return normalized;
+};
+
+const normalizeExtractionInput = (raw: unknown): unknown => {
+  const parsedRaw = parseJsonCandidate(raw);
+  if (!isObject(parsedRaw)) {
+    return parsedRaw;
+  }
+
+  const normalized: Record<string, unknown> = { ...parsedRaw };
+
+  normalized.emotions = toArray(parsedRaw.emotions).map((entry) =>
+    normalizeObjectWithNumericKeys(entry, ['intensity']),
+  );
+  normalized.entities = toArray(parsedRaw.entities).map((entry) =>
+    normalizeObjectWithNumericKeys(entry, [
+      'nameStart',
+      'nameEnd',
+      'evidenceStart',
+      'evidenceEnd',
+      'confidence',
+    ]),
+  );
+  normalized.facts = toArray(parsedRaw.facts).map((entry) =>
+    normalizeObjectWithNumericKeys(entry, ['evidenceStart', 'evidenceEnd', 'confidence']),
+  );
+  normalized.relations = toArray(parsedRaw.relations).map((entry) =>
+    normalizeObjectWithNumericKeys(entry, ['evidenceStart', 'evidenceEnd', 'confidence']),
+  );
+  normalized.groups = toArray(parsedRaw.groups).map((entry) => {
+    if (!isObject(entry)) {
+      return entry;
+    }
+
+    const group = { ...entry };
+    group.entityIds = toStringArray(group.entityIds);
+    group.factIds = toStringArray(group.factIds);
+    return group;
+  });
+  normalized.segments = toArray(parsedRaw.segments).map((entry) => {
+    const segment = normalizeObjectWithNumericKeys(entry, ['start', 'end']) as unknown;
+    if (!isObject(segment)) {
+      return segment;
+    }
+
+    return {
+      ...segment,
+      entityIds: toStringArray(segment.entityIds),
+      factIds: toStringArray(segment.factIds),
+      relationIndexes: toNumberArray(segment.relationIndexes),
+    };
+  });
+
+  return normalized;
+};
+
 const normalizePredicate = (predicate: string): string => {
   const normalized = predicate
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
@@ -384,7 +519,8 @@ const normalizeSentiment = (value: string): NoteSentiment => {
   return value as NoteSentiment;
 };
 
-export const validateExtractionV2 = (text: string, raw: unknown): ExtractionV2 => {
+export const validateExtractionV2 = (text: string, rawInput: unknown): ExtractionV2 => {
+  const raw = normalizeExtractionInput(rawInput);
   if (!isObject(raw)) {
     throw new Error('ExtractionV2 must be an object.');
   }

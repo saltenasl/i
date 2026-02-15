@@ -3,7 +3,7 @@ import net from 'node:net';
 import os from 'node:os';
 import { anthropic } from '@ai-sdk/anthropic';
 import { openai } from '@ai-sdk/openai';
-import { generateObject, generateText } from 'ai';
+import { generateObject, generateText, jsonSchema } from 'ai';
 import { ensureAssets } from './assets.js';
 import { buildPromptV2, buildSystemPromptV2, buildUserPromptV2 } from './prompt.js';
 import type { ExtractionDebug, ExtractionV2, FactPerspective, NoteSentiment } from './types.js';
@@ -16,6 +16,130 @@ const SERVER_REQUEST_TIMEOUT_MS = 20_000;
 const CLOUD_REQUEST_TIMEOUT_MS = 30_000;
 const ANTHROPIC_HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 const OPENAI_GPT5_MINI_MODEL = 'gpt-5-mini';
+const LOCAL_RECOVERY_DIRECTIVE =
+  'CRITICAL: Return exactly one complete JSON object. Ensure emotions/entities/facts/relations/groups are JSON arrays.';
+const CLOUD_RECOVERY_DIRECTIVE =
+  'Return one complete JSON object only. Do not omit required arrays (emotions, entities, facts, relations, groups).';
+
+const extractionV2JsonSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'title',
+    'noteType',
+    'summary',
+    'language',
+    'date',
+    'sentiment',
+    'emotions',
+    'entities',
+    'facts',
+    'relations',
+    'groups',
+  ],
+  properties: {
+    title: { type: 'string' },
+    noteType: { type: 'string' },
+    summary: { type: 'string' },
+    language: { type: 'string' },
+    date: { type: ['string', 'null'] },
+    sentiment: { type: 'string', enum: ['positive', 'negative', 'neutral', 'varied'] },
+    emotions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['emotion', 'intensity'],
+        properties: {
+          emotion: { type: 'string' },
+          intensity: { type: 'integer', minimum: 1, maximum: 5 },
+        },
+      },
+    },
+    entities: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['id', 'name', 'type', 'nameStart', 'nameEnd', 'confidence'],
+        properties: {
+          id: { type: 'string' },
+          name: { type: 'string' },
+          type: { type: 'string', enum: ['person', 'org', 'tool', 'place', 'concept', 'event'] },
+          nameStart: { type: 'integer', minimum: 0 },
+          nameEnd: { type: 'integer', minimum: 1 },
+          evidenceStart: { type: 'integer', minimum: 0 },
+          evidenceEnd: { type: 'integer', minimum: 1 },
+          context: { type: 'string' },
+          confidence: { type: 'number', minimum: 0, maximum: 1 },
+        },
+      },
+    },
+    facts: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: [
+          'id',
+          'ownerEntityId',
+          'perspective',
+          'predicate',
+          'evidenceStart',
+          'evidenceEnd',
+          'confidence',
+        ],
+        properties: {
+          id: { type: 'string' },
+          ownerEntityId: { type: 'string' },
+          perspective: { type: 'string', enum: ['self', 'other', 'uncertain'] },
+          subjectEntityId: { type: 'string' },
+          predicate: { type: 'string' },
+          objectEntityId: { type: 'string' },
+          objectText: { type: 'string' },
+          evidenceStart: { type: 'integer', minimum: 0 },
+          evidenceEnd: { type: 'integer', minimum: 1 },
+          confidence: { type: 'number', minimum: 0, maximum: 1 },
+        },
+      },
+    },
+    relations: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['fromEntityId', 'toEntityId', 'type', 'confidence'],
+        properties: {
+          fromEntityId: { type: 'string' },
+          toEntityId: { type: 'string' },
+          type: { type: 'string' },
+          evidenceStart: { type: 'integer', minimum: 0 },
+          evidenceEnd: { type: 'integer', minimum: 1 },
+          confidence: { type: 'number', minimum: 0, maximum: 1 },
+        },
+      },
+    },
+    groups: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['name', 'entityIds', 'factIds'],
+        properties: {
+          name: { type: 'string' },
+          entityIds: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+          factIds: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+        },
+      },
+    },
+  },
+} as const;
 
 export type ExtractionLaneId = 'local-llama' | 'anthropic-haiku' | 'openai-gpt5mini';
 
@@ -829,20 +953,23 @@ const runCloudExtractionBundle = async (
   const errors: string[] = [];
   let rawModelOutput = '';
   let validated: ExtractionV2 | null = null;
+  let fallbackUsed = false;
+
+  const model =
+    laneId === 'anthropic-haiku'
+      ? anthropic(ANTHROPIC_HAIKU_MODEL)
+      : openai(OPENAI_GPT5_MINI_MODEL);
 
   try {
-    const model =
-      laneId === 'anthropic-haiku'
-        ? anthropic(ANTHROPIC_HAIKU_MODEL)
-        : openai(OPENAI_GPT5_MINI_MODEL);
-
     const completion = await generateObject({
       model,
       system,
       prompt,
       maxOutputTokens: CLOUD_OUTPUT_TOKENS,
       timeout: CLOUD_REQUEST_TIMEOUT_MS,
-      output: 'no-schema',
+      schemaName: 'extraction_v2',
+      schemaDescription: 'Grounded extraction output for a personal note.',
+      schema: jsonSchema(extractionV2JsonSchema),
     });
 
     const structuredOutput = completion.object;
@@ -856,7 +983,31 @@ const runCloudExtractionBundle = async (
     }
   } catch (error) {
     errors.push(error instanceof Error ? error.message : String(error));
-    throw new Error(errors.join(' | '));
+  }
+
+  if (!validated) {
+    fallbackUsed = true;
+    try {
+      const completion = await generateText({
+        model,
+        system,
+        prompt: [prompt, '', CLOUD_RECOVERY_DIRECTIVE].join('\n'),
+        maxOutputTokens: CLOUD_OUTPUT_TOKENS,
+        timeout: CLOUD_REQUEST_TIMEOUT_MS,
+        temperature: 0,
+      });
+
+      rawModelOutput = completion.text;
+      const parsed = parseAndValidateExtractionV2Output(text, rawModelOutput);
+      validated = postProcessExtractionV2(parsed, text);
+
+      if (validated.entities.length === 0 && validated.facts.length === 0) {
+        throw new Error('Model output had no entities/facts.');
+      }
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+      throw new Error(errors.join(' | '));
+    }
   }
 
   if (!validated) {
@@ -876,7 +1027,7 @@ const runCloudExtractionBundle = async (
       nPredict: CLOUD_OUTPUT_TOKENS,
       totalMs: 0,
     },
-    false,
+    fallbackUsed,
     errors,
   );
 };
@@ -896,16 +1047,34 @@ export async function extractWithDebug(text: string): Promise<{
 
   const runtime = await getRuntime();
   let validated: ExtractionV2 | null = null;
+  let fallbackUsed = false;
+  let nPredict = FAST_OUTPUT_TOKENS;
 
-  try {
-    rawModelOutput = await runLlamaCompletion(prompt, FAST_OUTPUT_TOKENS);
-    const parsed = parseAndValidateExtractionV2Output(text, rawModelOutput);
-    validated = postProcessExtractionV2(parsed, text);
-    if (validated.entities.length === 0 && validated.facts.length === 0) {
-      throw new Error('Model output had no entities/facts.');
+  const attempts: Array<{ promptValue: string; nPredictValue: number }> = [
+    { promptValue: prompt, nPredictValue: FAST_OUTPUT_TOKENS },
+    {
+      promptValue: [prompt, '', LOCAL_RECOVERY_DIRECTIVE].join('\n'),
+      nPredictValue: CLOUD_OUTPUT_TOKENS,
+    },
+  ];
+
+  for (const [index, attempt] of attempts.entries()) {
+    try {
+      rawModelOutput = await runLlamaCompletion(attempt.promptValue, attempt.nPredictValue);
+      const parsed = parseAndValidateExtractionV2Output(text, rawModelOutput);
+      validated = postProcessExtractionV2(parsed, text);
+      if (validated.entities.length === 0 && validated.facts.length === 0) {
+        throw new Error('Model output had no entities/facts.');
+      }
+      nPredict = attempt.nPredictValue;
+      fallbackUsed = index > 0;
+      break;
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
     }
-  } catch (error) {
-    errors.push(error instanceof Error ? error.message : String(error));
+  }
+
+  if (!validated) {
     throw new Error(errors.join(' | '));
   }
 
@@ -922,10 +1091,10 @@ export async function extractWithDebug(text: string): Promise<{
     {
       modelPath: runtime.modelPath,
       serverMode: runtime.mode,
-      nPredict: FAST_OUTPUT_TOKENS,
+      nPredict,
       totalMs: 0,
     },
-    false,
+    fallbackUsed,
     errors,
   );
 }
