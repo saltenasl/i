@@ -41,7 +41,7 @@ const parseString = (value: unknown, label: string): string => {
 };
 
 const parseOptionalString = (value: unknown, label: string): string | undefined => {
-  if (value === undefined) {
+  if (value === undefined || value === null) {
     return undefined;
   }
   return parseString(value, label);
@@ -747,7 +747,7 @@ export const validateExtractionV2 = (text: string, rawInput: unknown): Extractio
     let evidenceStart: number | undefined;
     let evidenceEnd: number | undefined;
 
-    if (evidenceStartRaw !== undefined && evidenceEndRaw !== undefined) {
+    if (evidenceStartRaw != null && evidenceEndRaw != null) {
       evidenceStart = parseNumber(evidenceStartRaw, `relations[${index}].evidenceStart`);
       evidenceEnd = parseNumber(evidenceEndRaw, `relations[${index}].evidenceEnd`);
 
