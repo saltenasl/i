@@ -13,6 +13,10 @@ export const CompareTimeline = ({
   completed: number;
   total: number;
 }) => {
+  const activeLanes = compareLaneOrder
+    .map((laneId) => lanes.find((entry) => entry.laneId === laneId))
+    .filter((lane): lane is CompareLaneUi => lane !== undefined);
+
   return (
     <section data-testid="compare-results" style={{ marginTop: 18, display: 'grid', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -29,17 +33,13 @@ export const CompareTimeline = ({
           width: '100%',
           gap: 12,
           alignItems: 'start',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+          gridTemplateColumns: `repeat(${activeLanes.length}, 1fr)`,
+          overflowX: 'auto',
         }}
       >
-        {compareLaneOrder.map((laneId) => {
-          const lane = lanes.find((entry) => entry.laneId === laneId);
-          if (!lane) {
-            return null;
-          }
-
-          return <CompareColumn key={laneId} lane={lane} sourceText={sourceText} />;
-        })}
+        {activeLanes.map((lane) => (
+          <CompareColumn key={lane.laneId} lane={lane} sourceText={sourceText} />
+        ))}
       </div>
     </section>
   );
@@ -69,8 +69,6 @@ const CompareColumn = ({
         borderRadius: 12,
         background: '#fff',
         overflow: 'hidden',
-        maxHeight: '80vh',
-        overflowY: 'auto',
       }}
     >
       <header

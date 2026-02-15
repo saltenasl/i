@@ -41,22 +41,8 @@ export const ExtractPage = () => {
   }, [api]);
 
   useEffect(() => {
-    const initLoad = async () => {
-      const response = await api.call('extract.history.list', { limit: 100 });
-      if (!response.ok) {
-        setHistoryError(response.error.message);
-        return;
-      }
-      setHistoryError(null);
-      setHistoryEntries(response.data.entries);
-
-      const latest = response.data.entries[0];
-      if (latest) {
-        window.location.hash = `#/view/${latest.id}`;
-      }
-    };
-    void initLoad();
-  }, [api]);
+    void loadHistory();
+  }, [loadHistory]);
 
   const submit = async () => {
     setIsSubmitting(true);

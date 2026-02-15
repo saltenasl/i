@@ -57,9 +57,22 @@ export const ViewPage = ({ id }: { id: string }) => {
   return (
     <section style={{ display: 'grid', gap: 18 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <a href="#/" data-testid="view-back-link" style={{ fontSize: 13, color: '#4c6ef5' }}>
-          Back to Extract
-        </a>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <a
+            href="#/"
+            data-testid="view-back-link"
+            style={{
+              fontSize: 13,
+              color: '#4c6ef5',
+              textDecoration: 'none',
+              padding: '4px 10px',
+              borderRadius: 6,
+              border: '1px solid #4c6ef5',
+            }}
+          >
+            New Extract
+          </a>
+        </div>
         <span style={{ fontSize: 12, opacity: 0.7 }}>
           {new Date(entry.createdAt).toLocaleString()}
         </span>

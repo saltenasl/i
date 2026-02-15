@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+import { useApi } from './api-context.js';
 import { useHashRoute } from './hooks/useHashRoute.js';
 import { ExtractPage } from './routes/ExtractPage.js';
 import { NotesPage } from './routes/NotesPage.js';
@@ -5,6 +7,29 @@ import { ViewPage } from './routes/ViewPage.js';
 
 export const App = () => {
   const { route, params } = useHashRoute();
+  const api = useApi();
+  const didAutoView = useRef(false);
+
+  useEffect(() => {
+    if (didAutoView.current) {
+      return;
+    }
+    if (route !== 'extract') {
+      return;
+    }
+    didAutoView.current = true;
+
+    const autoView = async () => {
+      const response = await api.call('extract.history.list', { limit: 1 });
+      if (response.ok) {
+        const latest = response.data.entries[0];
+        if (latest) {
+          window.location.hash = `#/view/${latest.id}`;
+        }
+      }
+    };
+    void autoView();
+  }, [route, api]);
 
   return (
     <main

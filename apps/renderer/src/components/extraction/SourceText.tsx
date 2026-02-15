@@ -2,7 +2,7 @@ import type { ExtractionV2 } from '@repo/api';
 import { useMemo } from 'react';
 import { cardStyle, sectionHeader, sourceTextContainer } from '../../styles/extraction-theme.js';
 import type { ActiveHighlights, EntitySwatch, HoverTarget } from '../../types/extraction-ui.js';
-import { getEntitySwatch } from '../../utils/extraction-color-utils.js';
+import { DEFAULT_SWATCH, getEntitySwatch } from '../../utils/extraction-color-utils.js';
 import { buildEnhancedSourceTokens } from '../../utils/extraction-token-utils.js';
 
 export const ExtractionSourceText = ({
@@ -26,6 +26,8 @@ export const ExtractionSourceText = ({
     () => buildEnhancedSourceTokens(sourceText, entities, facts, relations),
     [sourceText, entities, facts, relations],
   );
+
+  const factById = useMemo(() => new Map(facts.map((f) => [f.id, f])), [facts]);
 
   return (
     <div style={{ ...cardStyle, padding: '16px 20px' }}>
@@ -56,7 +58,13 @@ export const ExtractionSourceText = ({
                   boxShadow: isActive ? `0 0 0 2px ${swatch.accent} inset` : 'none',
                   cursor: 'pointer',
                   transition: 'box-shadow 0.08s ease',
-                  borderBottom: getEvidenceUnderline(evidenceSpans, entitySwatchById, active),
+                  borderBottom: getEvidenceUnderline(
+                    evidenceSpans,
+                    entitySwatchById,
+                    factById,
+                    relations,
+                    active,
+                  ),
                 }}
                 title={entityId}
               >
@@ -71,7 +79,7 @@ export const ExtractionSourceText = ({
               return <span key={`plain-${token.start}`}>{token.text}</span>;
             }
             const isActive = isEvidenceSpanActive(topSpan, active);
-            const swatch = getEvidenceSpanSwatch(topSpan, entitySwatchById);
+            const swatch = getEvidenceSpanSwatch(topSpan, entitySwatchById, factById, relations);
             return (
               <span
                 key={`evidence-${topSpan.type}-${topSpan.id}-${token.start}`}
@@ -113,6 +121,8 @@ const getEvidenceLineStyle = (type: string): string => {
 const getEvidenceUnderline = (
   evidenceSpans: Array<{ type: string; id: string }>,
   entitySwatchById: Map<string, EntitySwatch>,
+  factById: Map<string, ExtractionV2['facts'][number]>,
+  relations: ExtractionV2['relations'],
   active: ActiveHighlights,
 ): string | undefined => {
   if (evidenceSpans.length === 0) {
@@ -123,7 +133,7 @@ const getEvidenceUnderline = (
     return undefined;
   }
   const isActive = isEvidenceSpanActive(topSpan, active);
-  const swatch = getEvidenceSpanSwatch(topSpan, entitySwatchById);
+  const swatch = getEvidenceSpanSwatch(topSpan, entitySwatchById, factById, relations);
   return `2px ${getEvidenceLineStyle(topSpan.type)} ${isActive ? swatch.accent : 'transparent'}`;
 };
 
@@ -146,11 +156,25 @@ const isEvidenceSpanActive = (
 const getEvidenceSpanSwatch = (
   span: { type: string; id: string },
   entitySwatchById: Map<string, EntitySwatch>,
+  factById: Map<string, ExtractionV2['facts'][number]>,
+  relations: ExtractionV2['relations'],
 ): EntitySwatch => {
   if (span.type === 'entity-evidence') {
     return getEntitySwatch(span.id, entitySwatchById);
   }
-  return { fill: '#e9ecef', accent: '#6366f1' };
+  if (span.type === 'fact-evidence') {
+    const fact = factById.get(span.id);
+    if (fact) {
+      return getEntitySwatch(fact.ownerEntityId, entitySwatchById);
+    }
+  }
+  if (span.type === 'relation-evidence') {
+    const relation = relations[Number(span.id)];
+    if (relation) {
+      return getEntitySwatch(relation.fromEntityId, entitySwatchById);
+    }
+  }
+  return DEFAULT_SWATCH;
 };
 
 const setHoverTargetForEvidence = (
