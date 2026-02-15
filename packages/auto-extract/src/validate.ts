@@ -195,6 +195,10 @@ const normalizePredicate = (predicate: string): string => {
 
 const parseJsonObjectFromOutput = (rawOutput: string): unknown => {
   const trimmed = rawOutput.trim();
+  const withoutFence = trimmed
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/, '')
+    .trim();
 
   const findFirstJsonObject = (input: string): string | null => {
     const startIndex = input.indexOf('{');
@@ -248,13 +252,13 @@ const parseJsonObjectFromOutput = (rawOutput: string): unknown => {
   };
 
   try {
-    return JSON.parse(trimmed);
+    return JSON.parse(withoutFence);
   } catch (error) {
-    const candidate = findFirstJsonObject(trimmed);
+    const candidate = findFirstJsonObject(withoutFence);
     if (!candidate) {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(
-        `Model output is not valid JSON: ${message}. Raw output: ${trimmed.slice(0, 1200)}`,
+        `Model output is not valid JSON: ${message}. Raw output: ${withoutFence.slice(0, 1200)}`,
       );
     }
 
@@ -263,7 +267,7 @@ const parseJsonObjectFromOutput = (rawOutput: string): unknown => {
     } catch {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(
-        `Model output is not valid JSON: ${message}. Raw output: ${trimmed.slice(0, 1200)}`,
+        `Model output is not valid JSON: ${message}. Raw output: ${withoutFence.slice(0, 1200)}`,
       );
     }
   }

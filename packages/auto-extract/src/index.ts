@@ -52,7 +52,7 @@ const extractionV2JsonSchema = {
         required: ['emotion', 'intensity'],
         properties: {
           emotion: { type: 'string' },
-          intensity: { type: 'integer', minimum: 1, maximum: 5 },
+          intensity: { type: 'integer' },
         },
       },
     },
@@ -61,17 +61,27 @@ const extractionV2JsonSchema = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['id', 'name', 'type', 'nameStart', 'nameEnd', 'confidence'],
+        required: [
+          'id',
+          'name',
+          'type',
+          'nameStart',
+          'nameEnd',
+          'evidenceStart',
+          'evidenceEnd',
+          'context',
+          'confidence',
+        ],
         properties: {
           id: { type: 'string' },
           name: { type: 'string' },
           type: { type: 'string', enum: ['person', 'org', 'tool', 'place', 'concept', 'event'] },
-          nameStart: { type: 'integer', minimum: 0 },
-          nameEnd: { type: 'integer', minimum: 1 },
-          evidenceStart: { type: 'integer', minimum: 0 },
-          evidenceEnd: { type: 'integer', minimum: 1 },
-          context: { type: 'string' },
-          confidence: { type: 'number', minimum: 0, maximum: 1 },
+          nameStart: { type: 'integer' },
+          nameEnd: { type: 'integer' },
+          evidenceStart: { type: ['integer', 'null'] },
+          evidenceEnd: { type: ['integer', 'null'] },
+          context: { type: ['string', 'null'] },
+          confidence: { type: 'number' },
         },
       },
     },
@@ -84,7 +94,10 @@ const extractionV2JsonSchema = {
           'id',
           'ownerEntityId',
           'perspective',
+          'subjectEntityId',
           'predicate',
+          'objectEntityId',
+          'objectText',
           'evidenceStart',
           'evidenceEnd',
           'confidence',
@@ -93,13 +106,13 @@ const extractionV2JsonSchema = {
           id: { type: 'string' },
           ownerEntityId: { type: 'string' },
           perspective: { type: 'string', enum: ['self', 'other', 'uncertain'] },
-          subjectEntityId: { type: 'string' },
+          subjectEntityId: { type: ['string', 'null'] },
           predicate: { type: 'string' },
-          objectEntityId: { type: 'string' },
-          objectText: { type: 'string' },
-          evidenceStart: { type: 'integer', minimum: 0 },
-          evidenceEnd: { type: 'integer', minimum: 1 },
-          confidence: { type: 'number', minimum: 0, maximum: 1 },
+          objectEntityId: { type: ['string', 'null'] },
+          objectText: { type: ['string', 'null'] },
+          evidenceStart: { type: 'integer' },
+          evidenceEnd: { type: 'integer' },
+          confidence: { type: 'number' },
         },
       },
     },
@@ -108,14 +121,21 @@ const extractionV2JsonSchema = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['fromEntityId', 'toEntityId', 'type', 'confidence'],
+        required: [
+          'fromEntityId',
+          'toEntityId',
+          'type',
+          'evidenceStart',
+          'evidenceEnd',
+          'confidence',
+        ],
         properties: {
           fromEntityId: { type: 'string' },
           toEntityId: { type: 'string' },
           type: { type: 'string' },
-          evidenceStart: { type: 'integer', minimum: 0 },
-          evidenceEnd: { type: 'integer', minimum: 1 },
-          confidence: { type: 'number', minimum: 0, maximum: 1 },
+          evidenceStart: { type: ['integer', 'null'] },
+          evidenceEnd: { type: ['integer', 'null'] },
+          confidence: { type: 'number' },
         },
       },
     },
@@ -140,6 +160,10 @@ const extractionV2JsonSchema = {
     },
   },
 } as const;
+
+const hasRequiredFacts = (extraction: ExtractionV2): boolean => {
+  return extraction.facts.length > 0;
+};
 
 export type ExtractionLaneId = 'local-llama' | 'anthropic-haiku' | 'openai-gpt5mini';
 
@@ -978,8 +1002,8 @@ const runCloudExtractionBundle = async (
     const parsed = validateExtractionV2(text, structuredOutput);
     validated = postProcessExtractionV2(parsed, text);
 
-    if (validated.entities.length === 0 && validated.facts.length === 0) {
-      throw new Error('Model output had no entities/facts.');
+    if (!hasRequiredFacts(validated)) {
+      throw new Error('Model output had no facts.');
     }
   } catch (error) {
     errors.push(error instanceof Error ? error.message : String(error));
@@ -1001,8 +1025,8 @@ const runCloudExtractionBundle = async (
       const parsed = parseAndValidateExtractionV2Output(text, rawModelOutput);
       validated = postProcessExtractionV2(parsed, text);
 
-      if (validated.entities.length === 0 && validated.facts.length === 0) {
-        throw new Error('Model output had no entities/facts.');
+      if (!hasRequiredFacts(validated)) {
+        throw new Error('Model output had no facts.');
       }
     } catch (error) {
       errors.push(error instanceof Error ? error.message : String(error));
@@ -1063,8 +1087,8 @@ export async function extractWithDebug(text: string): Promise<{
       rawModelOutput = await runLlamaCompletion(attempt.promptValue, attempt.nPredictValue);
       const parsed = parseAndValidateExtractionV2Output(text, rawModelOutput);
       validated = postProcessExtractionV2(parsed, text);
-      if (validated.entities.length === 0 && validated.facts.length === 0) {
-        throw new Error('Model output had no entities/facts.');
+      if (!hasRequiredFacts(validated)) {
+        throw new Error('Model output had no facts.');
       }
       nPredict = attempt.nPredictValue;
       fallbackUsed = index > 0;
