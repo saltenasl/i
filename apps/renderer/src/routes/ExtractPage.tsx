@@ -30,7 +30,6 @@ export const ExtractPage = () => {
     extractionV2: ExtractionV2;
     debug: ExtractionDebug;
   } | null>(null);
-
   const loadHistory = useCallback(async () => {
     const response = await api.call('extract.history.list', { limit: 100 });
     if (!response.ok) {
@@ -42,8 +41,22 @@ export const ExtractPage = () => {
   }, [api]);
 
   useEffect(() => {
-    void loadHistory();
-  }, [loadHistory]);
+    const initLoad = async () => {
+      const response = await api.call('extract.history.list', { limit: 100 });
+      if (!response.ok) {
+        setHistoryError(response.error.message);
+        return;
+      }
+      setHistoryError(null);
+      setHistoryEntries(response.data.entries);
+
+      const latest = response.data.entries[0];
+      if (latest) {
+        window.location.hash = `#/view/${latest.id}`;
+      }
+    };
+    void initLoad();
+  }, [api]);
 
   const submit = async () => {
     setIsSubmitting(true);

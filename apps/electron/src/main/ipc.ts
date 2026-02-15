@@ -25,6 +25,8 @@ const invokeHandler = async (
       return handlers['extract.compareLane'](request.input);
     case 'extract.compare':
       return handlers['extract.compare'](request.input);
+    case 'extract.history.get':
+      return handlers['extract.history.get'](request.input);
   }
 
   throw new Error(`Unsupported IPC method: ${(request as AnyIpcApiRequest).method}`);
