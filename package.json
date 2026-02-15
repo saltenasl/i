@@ -8,7 +8,7 @@
   },
   "packageManager": "pnpm@10.28.0",
   "scripts": {
-    "dev": "concurrently -k -n renderer,electron \"pnpm --filter @repo/renderer dev\" \"pnpm --filter @repo/electron dev\"",
+    "dev": "mkdir -p .local && APP_DB_PATH=$(pwd)/.local/app.sqlite concurrently -k -n renderer,electron \"pnpm --filter @repo/renderer dev\" \"pnpm --filter @repo/electron dev\"",
     "build": "pnpm --filter @repo/renderer build && pnpm --filter @repo/electron build",
     "r": "pnpm build && mkdir -p .local && APP_DB_PATH=$(pwd)/.local/app.sqlite RENDERER_DIST=$(pwd)/apps/renderer/dist electron apps/electron/dist/main/index.js",
     "lint": "biome check .",
