@@ -4,6 +4,13 @@ import type { ActiveHighlights, EntitySwatch, HoverTarget } from '../../types/ex
 import { getEntitySwatch } from '../../utils/extraction-color-utils.js';
 import { formatSpan, getExcerpt } from '../../utils/extraction-format-utils.js';
 
+const clampLines = (lines: number) => ({
+  display: '-webkit-box',
+  WebkitLineClamp: lines,
+  WebkitBoxOrient: 'vertical' as const,
+  overflow: 'hidden',
+});
+
 export const ExtractionFacts = ({
   facts,
   sourceText,
@@ -43,12 +50,12 @@ export const ExtractionFacts = ({
           listStyle: 'none',
           display: 'grid',
           gap: compact ? 6 : 8,
-          ...(compact ? { maxHeight: 360, overflowY: 'auto', paddingRight: 2 } : {}),
         }}
       >
         {facts.map((fact) => {
           const ownerSwatch = getEntitySwatch(fact.ownerEntityId, entitySwatchById);
           const isActive = active.factIds.has(fact.id);
+          const showExpanded = !compact || isActive;
           return (
             <li
               key={fact.id}
@@ -65,7 +72,7 @@ export const ExtractionFacts = ({
                 fontSize: compact ? 13 : 14,
               }}
             >
-              <div>
+              <div style={showExpanded ? undefined : clampLines(2)}>
                 owner=<strong>{getEntityLabel(fact.ownerEntityId)}</strong> perspective=
                 <strong>{fact.perspective}</strong> | {getEntityLabel(fact.subjectEntityId)} {'->'}{' '}
                 <strong>{fact.predicate}</strong> {'->'}{' '}
@@ -74,11 +81,29 @@ export const ExtractionFacts = ({
                   : (fact.objectText ?? '-')}{' '}
                 | [{formatSpan(fact.evidenceStart, fact.evidenceEnd)}]
               </div>
-              <div style={{ marginTop: 3, opacity: 0.78 }}>
-                id={fact.id} segment={fact.segmentId ?? '-'} confidence=
-                {fact.confidence.toFixed(2)}
+              <div
+                style={{
+                  marginTop: 3,
+                  opacity: 0.78,
+                  ...(showExpanded ? {} : clampLines(1)),
+                }}
+              >
+                {showExpanded ? (
+                  <>
+                    id={fact.id} segment={fact.segmentId ?? '-'} confidence=
+                    {fact.confidence.toFixed(2)}
+                  </>
+                ) : (
+                  <>confidence={fact.confidence.toFixed(2)}</>
+                )}
               </div>
-              <div style={{ marginTop: 2, opacity: 0.85 }}>
+              <div
+                style={{
+                  marginTop: 2,
+                  opacity: 0.85,
+                  ...(showExpanded ? {} : clampLines(1)),
+                }}
+              >
                 {getExcerpt(sourceText, fact.evidenceStart, fact.evidenceEnd)}
               </div>
             </li>

@@ -19,7 +19,6 @@ export const ExtractionEmotions = ({
           listStyle: 'none',
           display: 'grid',
           gap: compact ? 4 : 6,
-          ...(compact ? { maxHeight: 156, overflowY: 'auto', paddingRight: 2 } : {}),
         }}
       >
         {extractionV2.emotions.length === 0 ? (

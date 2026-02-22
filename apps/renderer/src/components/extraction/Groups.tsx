@@ -2,6 +2,13 @@ import type { ExtractionV2 } from '@repo/api';
 import { cardStyle, itemRow, sectionHeader } from '../../styles/extraction-theme.js';
 import type { ActiveHighlights, EntitySwatch, HoverTarget } from '../../types/extraction-ui.js';
 
+const clampLines = (lines: number) => ({
+  display: '-webkit-box',
+  WebkitLineClamp: lines,
+  WebkitBoxOrient: 'vertical' as const,
+  overflow: 'hidden',
+});
+
 export const ExtractionGroups = ({
   groups,
   entityById,
@@ -36,7 +43,6 @@ export const ExtractionGroups = ({
           listStyle: 'none',
           display: 'grid',
           gap: compact ? 6 : 8,
-          ...(compact ? { maxHeight: 240, overflowY: 'auto', paddingRight: 2 } : {}),
         }}
       >
         {groups.length === 0 ? (
@@ -44,6 +50,7 @@ export const ExtractionGroups = ({
         ) : (
           groups.map((group) => {
             const isActive = active.groupNames.has(group.name);
+            const showExpanded = !compact || isActive;
             return (
               <li
                 key={group.name}
@@ -59,38 +66,61 @@ export const ExtractionGroups = ({
                   fontSize: compact ? 13 : 14,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                  <strong>{group.name}</strong>
-                  {' | entities='}
-                  {group.entityIds.length === 0
-                    ? '-'
-                    : group.entityIds.map((entityId) => {
-                        const swatch = entitySwatchById.get(entityId);
-                        return (
-                          <span
-                            key={entityId}
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}
-                          >
-                            {swatch ? (
-                              <span
-                                aria-hidden
-                                style={{
-                                  width: 10,
-                                  height: 10,
-                                  borderRadius: '50%',
-                                  background: swatch.fill,
-                                  border: `1px solid ${swatch.accent}`,
-                                  display: 'inline-block',
-                                }}
-                              />
-                            ) : null}
-                            {getEntityLabel(entityId)}
-                          </span>
-                        );
-                      })}
-                  {' | facts='}
-                  {group.factIds.length === 0 ? '-' : group.factIds.join(', ')}
-                </div>
+                {compact && !showExpanded ? (
+                  <div style={{ display: 'grid', gap: 2 }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        flexWrap: 'wrap',
+                        lineHeight: 1.15,
+                      }}
+                    >
+                      <strong>{group.name}</strong>
+                      <span style={{ opacity: 0.75 }}>entities={group.entityIds.length}</span>
+                      <span style={{ opacity: 0.75 }}>facts={group.factIds.length}</span>
+                    </div>
+                    <div style={{ opacity: 0.8, ...clampLines(1) }}>
+                      {group.entityIds.length === 0
+                        ? 'entities: -'
+                        : `entities: ${group.entityIds.map((entityId) => getEntityLabel(entityId)).join(', ')}`}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <strong>{group.name}</strong>
+                    {' | entities='}
+                    {group.entityIds.length === 0
+                      ? '-'
+                      : group.entityIds.map((entityId) => {
+                          const swatch = entitySwatchById.get(entityId);
+                          return (
+                            <span
+                              key={entityId}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}
+                            >
+                              {swatch ? (
+                                <span
+                                  aria-hidden
+                                  style={{
+                                    width: 10,
+                                    height: 10,
+                                    borderRadius: '50%',
+                                    background: swatch.fill,
+                                    border: `1px solid ${swatch.accent}`,
+                                    display: 'inline-block',
+                                  }}
+                                />
+                              ) : null}
+                              {getEntityLabel(entityId)}
+                            </span>
+                          );
+                        })}
+                    {' | facts='}
+                    {group.factIds.length === 0 ? '-' : group.factIds.join(', ')}
+                  </div>
+                )}
               </li>
             );
           })

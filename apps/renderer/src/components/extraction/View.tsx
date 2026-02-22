@@ -46,108 +46,155 @@ export const ExtractionView = ({
     [hoverTarget, extractionV2],
   );
 
-  const compactGridStyle = compact
-    ? ({
-        display: 'grid',
-        gap: 12,
-        gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
-        alignItems: 'start',
-      } as const)
-    : undefined;
+  if (compact) {
+    return (
+      <section
+        data-testid="extraction-v2-result"
+        data-layout="compact"
+        style={{
+          display: 'grid',
+          gap: 12,
+          gridTemplateColumns: 'minmax(0, 1.75fr) minmax(0, 1.25fr)',
+          alignItems: 'start',
+        }}
+      >
+        <div style={{ minWidth: 0, display: 'grid', gap: 12, alignContent: 'start' }}>
+          <ExtractionSourceText
+            sourceText={sourceText}
+            entities={extractionV2.entities}
+            facts={extractionV2.facts}
+            relations={extractionV2.relations}
+            entitySwatchById={entitySwatchById}
+            active={active}
+            setHoverTarget={setHoverTarget}
+            compact
+          />
 
-  const widget = (span: number): React.CSSProperties | undefined =>
-    compact ? { minWidth: 0, gridColumn: `span ${span}` } : undefined;
-
-  return (
-    <section
-      data-testid="extraction-v2-result"
-      data-layout={compact ? 'compact' : 'full'}
-      style={compact ? compactGridStyle : { display: 'grid', gap: 18 }}
-    >
-      <div style={widget(4)}>
-        <ExtractionMetadata extractionV2={extractionV2} compact={compact} />
-      </div>
-
-      <div style={widget(4)}>
-        <ExtractionEmotions extractionV2={extractionV2} compact={compact} />
-      </div>
-
-      {showDebugActions ? (
-        <div style={widget(4)}>
-          <ExtractionDebugActions sourceText={sourceText} debug={debug} />
-        </div>
-      ) : null}
-
-      <div style={widget(compact ? 7 : 12)}>
-        <ExtractionSourceText
-          sourceText={sourceText}
-          entities={extractionV2.entities}
-          facts={extractionV2.facts}
-          relations={extractionV2.relations}
-          entitySwatchById={entitySwatchById}
-          active={active}
-          setHoverTarget={setHoverTarget}
-          compact={compact}
-        />
-      </div>
-
-      <div style={widget(compact ? 5 : 12)}>
-        <ExtractionEntities
-          entities={extractionV2.entities}
-          sourceText={sourceText}
-          entitySwatchById={entitySwatchById}
-          active={active}
-          setHoverTarget={setHoverTarget}
-          compact={compact}
-        />
-      </div>
-
-      <div style={widget(compact ? 8 : 12)}>
-        <ExtractionFacts
-          facts={extractionV2.facts}
-          sourceText={sourceText}
-          entityById={entityById}
-          entitySwatchById={entitySwatchById}
-          active={active}
-          setHoverTarget={setHoverTarget}
-          compact={compact}
-        />
-      </div>
-
-      <div style={widget(compact ? 4 : 12)}>
-        <ExtractionRelations
-          relations={extractionV2.relations}
-          entityById={entityById}
-          entitySwatchById={entitySwatchById}
-          active={active}
-          setHoverTarget={setHoverTarget}
-          compact={compact}
-        />
-      </div>
-
-      <div style={widget(compact ? 4 : 12)}>
-        <ExtractionGroups
-          groups={extractionV2.groups}
-          entityById={entityById}
-          entitySwatchById={entitySwatchById}
-          active={active}
-          setHoverTarget={setHoverTarget}
-          compact={compact}
-        />
-      </div>
-
-      {showSegments ? (
-        <div style={widget(12)}>
-          <ExtractionSegments
-            segments={extractionV2.segments}
-            sourceTextLength={sourceText.length}
+          <ExtractionFacts
+            facts={extractionV2.facts}
+            sourceText={sourceText}
             entityById={entityById}
             entitySwatchById={entitySwatchById}
             active={active}
             setHoverTarget={setHoverTarget}
-            compact={compact}
+            compact
+          />
+
+          {showSegments ? (
+            <ExtractionSegments
+              segments={extractionV2.segments}
+              sourceTextLength={sourceText.length}
+              entityById={entityById}
+              entitySwatchById={entitySwatchById}
+              active={active}
+              setHoverTarget={setHoverTarget}
+              compact
+            />
+          ) : null}
+        </div>
+
+        <div style={{ minWidth: 0, display: 'grid', gap: 12, alignContent: 'start' }}>
+          <ExtractionMetadata extractionV2={extractionV2} compact />
+          <ExtractionEmotions extractionV2={extractionV2} compact />
+
+          {showDebugActions ? (
+            <ExtractionDebugActions sourceText={sourceText} debug={debug} />
+          ) : null}
+
+          <ExtractionEntities
+            entities={extractionV2.entities}
+            sourceText={sourceText}
+            entitySwatchById={entitySwatchById}
+            active={active}
+            setHoverTarget={setHoverTarget}
+            compact
+          />
+
+          <ExtractionRelations
+            relations={extractionV2.relations}
+            entityById={entityById}
+            entitySwatchById={entitySwatchById}
+            active={active}
+            setHoverTarget={setHoverTarget}
+            compact
+          />
+
+          <ExtractionGroups
+            groups={extractionV2.groups}
+            entityById={entityById}
+            entitySwatchById={entitySwatchById}
+            active={active}
+            setHoverTarget={setHoverTarget}
+            compact
           />
         </div>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      data-testid="extraction-v2-result"
+      data-layout="full"
+      style={{ display: 'grid', gap: 18 }}
+    >
+      <ExtractionMetadata extractionV2={extractionV2} />
+      <ExtractionEmotions extractionV2={extractionV2} />
+
+      {showDebugActions ? <ExtractionDebugActions sourceText={sourceText} debug={debug} /> : null}
+
+      <ExtractionSourceText
+        sourceText={sourceText}
+        entities={extractionV2.entities}
+        facts={extractionV2.facts}
+        relations={extractionV2.relations}
+        entitySwatchById={entitySwatchById}
+        active={active}
+        setHoverTarget={setHoverTarget}
+      />
+
+      <ExtractionEntities
+        entities={extractionV2.entities}
+        sourceText={sourceText}
+        entitySwatchById={entitySwatchById}
+        active={active}
+        setHoverTarget={setHoverTarget}
+      />
+
+      <ExtractionFacts
+        facts={extractionV2.facts}
+        sourceText={sourceText}
+        entityById={entityById}
+        entitySwatchById={entitySwatchById}
+        active={active}
+        setHoverTarget={setHoverTarget}
+      />
+
+      <ExtractionRelations
+        relations={extractionV2.relations}
+        entityById={entityById}
+        entitySwatchById={entitySwatchById}
+        active={active}
+        setHoverTarget={setHoverTarget}
+      />
+
+      <ExtractionGroups
+        groups={extractionV2.groups}
+        entityById={entityById}
+        entitySwatchById={entitySwatchById}
+        active={active}
+        setHoverTarget={setHoverTarget}
+      />
+
+      {showSegments ? (
+        <ExtractionSegments
+          segments={extractionV2.segments}
+          sourceTextLength={sourceText.length}
+          entityById={entityById}
+          entitySwatchById={entitySwatchById}
+          active={active}
+          setHoverTarget={setHoverTarget}
+        />
       ) : null}
     </section>
   );

@@ -9,6 +9,13 @@ import type { ActiveHighlights, EntitySwatch, HoverTarget } from '../../types/ex
 import { getEntitySwatch } from '../../utils/extraction-color-utils.js';
 import { formatOptionalSpan, formatSpan, getExcerpt } from '../../utils/extraction-format-utils.js';
 
+const clampLines = (lines: number) => ({
+  display: '-webkit-box',
+  WebkitLineClamp: lines,
+  WebkitBoxOrient: 'vertical' as const,
+  overflow: 'hidden',
+});
+
 export const ExtractionEntities = ({
   entities,
   sourceText,
@@ -35,12 +42,12 @@ export const ExtractionEntities = ({
           listStyle: 'none',
           display: 'grid',
           gap: compact ? 6 : 8,
-          ...(compact ? { maxHeight: 260, overflowY: 'auto', paddingRight: 2 } : {}),
         }}
       >
         {entities.map((entity) => {
           const swatch = getEntitySwatch(entity.id, entitySwatchById);
           const isActive = active.entityIds.has(entity.id);
+          const showExpanded = !compact || isActive;
           const badge = entityTypeBadges[entity.type];
           return (
             <li
@@ -57,7 +64,15 @@ export const ExtractionEntities = ({
                 fontSize: compact ? 13 : 14,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: compact ? 6 : 8,
+                  flexWrap: 'wrap',
+                  lineHeight: compact ? 1.15 : 1.2,
+                }}
+              >
                 <span
                   aria-hidden
                   style={{
@@ -82,21 +97,37 @@ export const ExtractionEntities = ({
                 >
                   {entity.type}
                 </span>
-                [{formatSpan(entity.nameStart, entity.nameEnd)}]
-                <span style={{ opacity: 0.7 }}>id={entity.id}</span>
-                <span style={{ opacity: 0.7 }}>
-                  evidence={formatOptionalSpan(entity.evidenceStart, entity.evidenceEnd)}
+                <span style={{ opacity: 0.8 }}>
+                  [{formatSpan(entity.nameStart, entity.nameEnd)}]
                 </span>
-                <span style={{ opacity: 0.7 }}>confidence={entity.confidence.toFixed(2)}</span>
+                <span style={{ opacity: 0.75 }}>conf={entity.confidence.toFixed(2)}</span>
+                {showExpanded ? <span style={{ opacity: 0.7 }}>id={entity.id}</span> : null}
+                {showExpanded ? (
+                  <span style={{ opacity: 0.7 }}>
+                    evidence={formatOptionalSpan(entity.evidenceStart, entity.evidenceEnd)}
+                  </span>
+                ) : null}
               </div>
               <div
                 data-testid={`entity-excerpt-${entity.id}`}
-                style={{ marginTop: 4, opacity: 0.9 }}
+                style={{
+                  marginTop: compact ? 3 : 4,
+                  opacity: 0.9,
+                  ...(showExpanded ? {} : clampLines(2)),
+                }}
               >
                 {getExcerpt(sourceText, entity.nameStart, entity.nameEnd)}
               </div>
               {entity.context ? (
-                <div style={{ marginTop: 2, opacity: 0.75 }}>context: {entity.context}</div>
+                <div
+                  style={{
+                    marginTop: 2,
+                    opacity: 0.75,
+                    ...(showExpanded ? {} : clampLines(1)),
+                  }}
+                >
+                  context: {entity.context}
+                </div>
               ) : null}
             </li>
           );

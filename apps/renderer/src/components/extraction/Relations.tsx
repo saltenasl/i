@@ -4,6 +4,13 @@ import type { ActiveHighlights, EntitySwatch, HoverTarget } from '../../types/ex
 import { getEntitySwatch } from '../../utils/extraction-color-utils.js';
 import { formatOptionalSpan } from '../../utils/extraction-format-utils.js';
 
+const clampLines = (lines: number) => ({
+  display: '-webkit-box',
+  WebkitLineClamp: lines,
+  WebkitBoxOrient: 'vertical' as const,
+  overflow: 'hidden',
+});
+
 export const ExtractionRelations = ({
   relations,
   entityById,
@@ -41,7 +48,6 @@ export const ExtractionRelations = ({
           listStyle: 'none',
           display: 'grid',
           gap: compact ? 6 : 8,
-          ...(compact ? { maxHeight: 240, overflowY: 'auto', paddingRight: 2 } : {}),
         }}
       >
         {relations.length === 0 ? (
@@ -50,6 +56,7 @@ export const ExtractionRelations = ({
           relations.map((relation, index) => {
             const relationSwatch = getEntitySwatch(relation.fromEntityId, entitySwatchById);
             const isActive = active.relationIndexes.has(index);
+            const showExpanded = !compact || isActive;
             return (
               <li
                 key={`${relation.fromEntityId}-${relation.toEntityId}-${relation.type}-${index}`}
@@ -65,11 +72,21 @@ export const ExtractionRelations = ({
                   fontSize: compact ? 13 : 14,
                 }}
               >
-                #{index} {getEntityLabel(relation.fromEntityId)} {'->'}{' '}
-                <strong>{relation.type}</strong> {'->'} {getEntityLabel(relation.toEntityId)} |
-                evidence=
-                {formatOptionalSpan(relation.evidenceStart, relation.evidenceEnd)} | confidence=
-                {relation.confidence.toFixed(2)}
+                <div style={showExpanded ? undefined : clampLines(2)}>
+                  #{index} {getEntityLabel(relation.fromEntityId)} {'->'}{' '}
+                  <strong>{relation.type}</strong> {'->'} {getEntityLabel(relation.toEntityId)}
+                  {showExpanded ? (
+                    <>
+                      {' '}
+                      | evidence=
+                      {formatOptionalSpan(relation.evidenceStart, relation.evidenceEnd)} |
+                      confidence=
+                      {relation.confidence.toFixed(2)}
+                    </>
+                  ) : (
+                    <> | conf={relation.confidence.toFixed(2)}</>
+                  )}
+                </div>
               </li>
             );
           })
