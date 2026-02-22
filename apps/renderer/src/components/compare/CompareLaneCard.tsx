@@ -122,6 +122,7 @@ export const CompareLaneCard = ({
         borderRadius: 10,
         background: '#fff',
         overflow: 'hidden',
+        scrollSnapAlign: 'start',
       }}
     >
       <span

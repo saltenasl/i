@@ -126,7 +126,11 @@ export const ExtractionHistoryList = ({
                           width: '100%',
                           gap: 12,
                           alignItems: 'start',
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                          gridAutoFlow: 'column',
+                          gridAutoColumns: 'minmax(100%, 100%)',
+                          overflowX: 'auto',
+                          overscrollBehaviorX: 'contain',
+                          scrollSnapType: 'x mandatory',
                         }}
                       >
                         {compareLaneOrder.map((laneId) => {
