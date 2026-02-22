@@ -3,15 +3,20 @@ import { cardStyle, sectionHeader, sentimentColors } from '../../styles/extracti
 
 export const ExtractionMetadata = ({
   extractionV2,
+  compact = false,
 }: {
   extractionV2: ExtractionV2;
+  compact?: boolean;
 }) => {
   const sentColor = sentimentColors[extractionV2.sentiment];
 
   return (
-    <div style={{ ...cardStyle, padding: '16px 20px' }}>
+    <div style={{ ...cardStyle, padding: compact ? '10px 12px' : '16px 20px' }}>
       <h3 style={sectionHeader}>Extraction Metadata</h3>
-      <ul data-testid="extraction-v2-metadata" style={{ margin: 0, paddingLeft: 18 }}>
+      <ul
+        data-testid="extraction-v2-metadata"
+        style={{ margin: 0, paddingLeft: 18, fontSize: compact ? 13 : 14, lineHeight: 1.25 }}
+      >
         <li>
           <strong>title</strong>: {extractionV2.title}
         </li>

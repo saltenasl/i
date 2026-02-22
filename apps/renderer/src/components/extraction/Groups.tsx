@@ -8,12 +8,14 @@ export const ExtractionGroups = ({
   entitySwatchById,
   active,
   setHoverTarget,
+  compact = false,
 }: {
   groups: ExtractionV2['groups'];
   entityById: Map<string, ExtractionV2['entities'][number]>;
   entitySwatchById: Map<string, EntitySwatch>;
   active: ActiveHighlights;
   setHoverTarget: (target: HoverTarget) => void;
+  compact?: boolean;
 }) => {
   const getEntityLabel = (entityId: string): string => {
     const entity = entityById.get(entityId);
@@ -24,11 +26,18 @@ export const ExtractionGroups = ({
   };
 
   return (
-    <div style={{ ...cardStyle, padding: '16px 20px' }}>
+    <div style={{ ...cardStyle, padding: compact ? '10px 12px' : '16px 20px' }}>
       <h3 style={sectionHeader}>Groups</h3>
       <ul
         data-testid="extraction-v2-groups"
-        style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'grid', gap: 8 }}
+        style={{
+          margin: 0,
+          paddingLeft: 0,
+          listStyle: 'none',
+          display: 'grid',
+          gap: compact ? 6 : 8,
+          ...(compact ? { maxHeight: 240, overflowY: 'auto', paddingRight: 2 } : {}),
+        }}
       >
         {groups.length === 0 ? (
           <li style={{ opacity: 0.7 }}>-</li>
@@ -44,8 +53,10 @@ export const ExtractionGroups = ({
                 onMouseLeave={() => setHoverTarget(null)}
                 style={{
                   ...itemRow,
+                  padding: compact ? '8px 10px' : itemRow.padding,
                   border: isActive ? '2px solid #4c6ef5' : '1px solid #d0d7de',
                   background: isActive ? '#edf2ff' : '#fff',
+                  fontSize: compact ? 13 : 14,
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>

@@ -13,6 +13,7 @@ export const ExtractionSourceText = ({
   entitySwatchById,
   active,
   setHoverTarget,
+  compact = false,
 }: {
   sourceText: string;
   entities: ExtractionV2['entities'];
@@ -21,6 +22,7 @@ export const ExtractionSourceText = ({
   entitySwatchById: Map<string, EntitySwatch>;
   active: ActiveHighlights;
   setHoverTarget: (target: HoverTarget) => void;
+  compact?: boolean;
 }) => {
   const tokens = useMemo(
     () => buildEnhancedSourceTokens(sourceText, entities, facts, relations),
@@ -30,11 +32,24 @@ export const ExtractionSourceText = ({
   const factById = useMemo(() => new Map(facts.map((f) => [f.id, f])), [facts]);
 
   return (
-    <div style={{ ...cardStyle, padding: '16px 20px' }}>
+    <div style={{ ...cardStyle, padding: compact ? '10px 12px' : '16px 20px' }}>
       <h3 style={sectionHeader}>Source Text</h3>
       <pre
         data-testid="extraction-v2-source"
-        style={{ ...sourceTextContainer, border: '1px solid #c3ccd5' }}
+        style={{
+          ...sourceTextContainer,
+          border: '1px solid #c3ccd5',
+          ...(compact
+            ? {
+                padding: 12,
+                fontSize: 15,
+                lineHeight: 1.35,
+                borderRadius: 10,
+                maxHeight: 240,
+                overflowY: 'auto',
+              }
+            : {}),
+        }}
       >
         {tokens.map((token) => {
           const entityNameSpan = token.spans.find((s) => s.type === 'entity-name');

@@ -101,6 +101,8 @@
 - Segmentation convention: segments are additive debug metadata only; facts are the primary structured surface and must remain complete without segment reliance.
 - Extraction UI convention: renderer must not display segment cards/lists; segment data may remain in debug payloads/contracts only.
 - History compare convention: extraction history entries originating from A/B compare must preserve the full lane set (including skipped/error lanes) and render auto-expanded lane cards matching the live compare presentation.
+- Compare density convention: A/B compare lanes use compact widget-style extraction cards sized for high information density, with internal scrolling for long lists instead of unbounded lane height.
+- Compare expansion convention: each compare lane expands/minimizes the full lane content in a single lane-level action (no nested "open full extraction" step).
 - V1 deprecation convention: extraction V1 payloads/types/debug fields are removed from API/runtime/UI; only V2 extraction contracts are supported.
 - Worktree convention: worktrees are optional; direct commits in the primary repository worktree are allowed when preferred to reduce workflow overhead.
 

@@ -3,15 +3,24 @@ import { cardStyle, emotionIntensityWidth, sectionHeader } from '../../styles/ex
 
 export const ExtractionEmotions = ({
   extractionV2,
+  compact = false,
 }: {
   extractionV2: ExtractionV2;
+  compact?: boolean;
 }) => {
   return (
-    <div style={{ ...cardStyle, padding: '16px 20px' }}>
+    <div style={{ ...cardStyle, padding: compact ? '10px 12px' : '16px 20px' }}>
       <h3 style={sectionHeader}>Emotions</h3>
       <ul
         data-testid="extraction-v2-emotions"
-        style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'grid', gap: 6 }}
+        style={{
+          margin: 0,
+          paddingLeft: 0,
+          listStyle: 'none',
+          display: 'grid',
+          gap: compact ? 4 : 6,
+          ...(compact ? { maxHeight: 156, overflowY: 'auto', paddingRight: 2 } : {}),
+        }}
       >
         {extractionV2.emotions.length === 0 ? (
           <li>-</li>
@@ -23,14 +32,16 @@ export const ExtractionEmotions = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: 10,
-                padding: '6px 0',
+                padding: compact ? '4px 0' : '6px 0',
               }}
             >
-              <span style={{ minWidth: 90, fontSize: 14 }}>{emotion.emotion}</span>
+              <span style={{ minWidth: compact ? 80 : 90, fontSize: compact ? 13 : 14 }}>
+                {emotion.emotion}
+              </span>
               <div
                 style={{
                   flex: 1,
-                  height: 8,
+                  height: compact ? 6 : 8,
                   borderRadius: 4,
                   background: '#e5e7eb',
                   overflow: 'hidden',

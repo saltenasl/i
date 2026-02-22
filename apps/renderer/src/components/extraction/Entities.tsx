@@ -15,19 +15,28 @@ export const ExtractionEntities = ({
   entitySwatchById,
   active,
   setHoverTarget,
+  compact = false,
 }: {
   entities: ExtractionV2['entities'];
   sourceText: string;
   entitySwatchById: Map<string, EntitySwatch>;
   active: ActiveHighlights;
   setHoverTarget: (target: HoverTarget) => void;
+  compact?: boolean;
 }) => {
   return (
-    <div style={{ ...cardStyle, padding: '16px 20px' }}>
+    <div style={{ ...cardStyle, padding: compact ? '10px 12px' : '16px 20px' }}>
       <h3 style={sectionHeader}>Entities</h3>
       <ul
         data-testid="extraction-v2-entities"
-        style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'grid', gap: 8 }}
+        style={{
+          margin: 0,
+          paddingLeft: 0,
+          listStyle: 'none',
+          display: 'grid',
+          gap: compact ? 6 : 8,
+          ...(compact ? { maxHeight: 260, overflowY: 'auto', paddingRight: 2 } : {}),
+        }}
       >
         {entities.map((entity) => {
           const swatch = getEntitySwatch(entity.id, entitySwatchById);
@@ -42,8 +51,10 @@ export const ExtractionEntities = ({
               onMouseLeave={() => setHoverTarget(null)}
               style={{
                 ...itemRow,
+                padding: compact ? '8px 10px' : itemRow.padding,
                 border: isActive ? `2px solid ${swatch.accent}` : '1px solid #d0d7de',
                 background: isActive ? '#fffaf0' : '#fff',
+                fontSize: compact ? 13 : 14,
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

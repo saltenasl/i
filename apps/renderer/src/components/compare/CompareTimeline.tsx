@@ -235,6 +235,8 @@ const CompareColumn = ({
             sourceText={sourceText}
             debug={lane.debug}
             showDebugActions={false}
+            showSegments={false}
+            layoutMode="compact"
           />
         </div>
       ) : null}

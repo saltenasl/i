@@ -11,6 +11,7 @@ export const ExtractionFacts = ({
   entitySwatchById,
   active,
   setHoverTarget,
+  compact = false,
 }: {
   facts: ExtractionV2['facts'];
   sourceText: string;
@@ -18,6 +19,7 @@ export const ExtractionFacts = ({
   entitySwatchById: Map<string, EntitySwatch>;
   active: ActiveHighlights;
   setHoverTarget: (target: HoverTarget) => void;
+  compact?: boolean;
 }) => {
   const getEntityLabel = (entityId: string | undefined): string => {
     if (!entityId) {
@@ -31,11 +33,18 @@ export const ExtractionFacts = ({
   };
 
   return (
-    <div style={{ ...cardStyle, padding: '16px 20px' }}>
+    <div style={{ ...cardStyle, padding: compact ? '10px 12px' : '16px 20px' }}>
       <h3 style={sectionHeader}>Facts</h3>
       <ul
         data-testid="extraction-v2-facts"
-        style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'grid', gap: 8 }}
+        style={{
+          margin: 0,
+          paddingLeft: 0,
+          listStyle: 'none',
+          display: 'grid',
+          gap: compact ? 6 : 8,
+          ...(compact ? { maxHeight: 360, overflowY: 'auto', paddingRight: 2 } : {}),
+        }}
       >
         {facts.map((fact) => {
           const ownerSwatch = getEntitySwatch(fact.ownerEntityId, entitySwatchById);
@@ -49,9 +58,11 @@ export const ExtractionFacts = ({
               onMouseLeave={() => setHoverTarget(null)}
               style={{
                 ...itemRow,
+                padding: compact ? '8px 10px' : itemRow.padding,
                 borderLeft: `5px solid ${ownerSwatch.accent}`,
                 background: isActive ? '#f8f2e7' : '#f7f7f8',
                 outline: isActive ? `2px solid ${ownerSwatch.accent}` : 'none',
+                fontSize: compact ? 13 : 14,
               }}
             >
               <div>

@@ -14,6 +14,7 @@ export const ExtractionSegments = ({
   entitySwatchById,
   active,
   setHoverTarget,
+  compact = false,
 }: {
   segments: ExtractionV2['segments'];
   sourceTextLength: number;
@@ -21,24 +22,25 @@ export const ExtractionSegments = ({
   entitySwatchById: Map<string, EntitySwatch>;
   active: ActiveHighlights;
   setHoverTarget: (target: HoverTarget) => void;
+  compact?: boolean;
 }) => {
   if (segments.length === 0) {
     return null;
   }
 
   return (
-    <div style={{ ...cardStyle, padding: '16px 20px' }}>
+    <div style={{ ...cardStyle, padding: compact ? '10px 12px' : '16px 20px' }}>
       <h3 style={sectionHeader}>Segments</h3>
 
       <div
         data-testid="segment-timeline"
         style={{
           display: 'flex',
-          height: 24,
+          height: compact ? 18 : 24,
           borderRadius: 6,
           overflow: 'hidden',
           background: '#e5e7eb',
-          marginBottom: 14,
+          marginBottom: compact ? 10 : 14,
         }}
       >
         {segments.map((segment) => {
@@ -71,7 +73,14 @@ export const ExtractionSegments = ({
 
       <ul
         data-testid="extraction-v2-segments"
-        style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'grid', gap: 8 }}
+        style={{
+          margin: 0,
+          paddingLeft: 0,
+          listStyle: 'none',
+          display: 'grid',
+          gap: compact ? 6 : 8,
+          ...(compact ? { maxHeight: 260, overflowY: 'auto', paddingRight: 2 } : {}),
+        }}
       >
         {segments.map((segment) => {
           const isActive = active.segmentIds.has(segment.id);
@@ -85,8 +94,10 @@ export const ExtractionSegments = ({
               onMouseLeave={() => setHoverTarget(null)}
               style={{
                 ...itemRow,
+                padding: compact ? '8px 10px' : itemRow.padding,
                 border: isActive ? `2px solid ${sentColor.border}` : '1px solid #d0d7de',
                 background: isActive ? sentColor.bg : '#fff',
+                fontSize: compact ? 13 : 14,
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

@@ -4,6 +4,7 @@ import type {
   ExtractionLaneResult,
   ExtractionV2,
 } from '@repo/api';
+import { useState } from 'react';
 import { ExtractionView } from '../extraction/View.js';
 
 export type CompareLaneUi = {
@@ -108,6 +109,8 @@ export const CompareLaneCard = ({
     lane.status === 'error' || lane.status === 'skipped'
       ? splitLaneErrorMessage(lane.errorMessage)
       : undefined;
+  const canExpand = lane.status === 'ok' && lane.extractionV2 && lane.debug;
+  const [expanded, setExpanded] = useState(false);
 
   return (
     <article
@@ -145,10 +148,46 @@ export const CompareLaneCard = ({
       </span>
 
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <strong style={{ fontSize: 13 }}>{laneLabel.label}</strong>
-        <span data-testid={`compare-lane-status-${lane.laneId}`} style={{ fontSize: 12 }}>
-          {lane.status}
-        </span>
+        <button
+          type="button"
+          onClick={() => {
+            if (canExpand) {
+              setExpanded((prev) => !prev);
+            }
+          }}
+          style={{
+            all: 'unset',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            width: '100%',
+            cursor: canExpand ? 'pointer' : 'default',
+            gap: 8,
+          }}
+          aria-expanded={canExpand ? expanded : undefined}
+        >
+          <strong style={{ fontSize: 13 }}>{laneLabel.label}</strong>
+          <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span data-testid={`compare-lane-status-${lane.laneId}`} style={{ fontSize: 12 }}>
+              {lane.status}
+            </span>
+            {canExpand ? (
+              <span
+                data-testid={`compare-lane-toggle-${lane.laneId}`}
+                style={{
+                  border: '1px solid #d0d7de',
+                  borderRadius: 6,
+                  padding: '2px 8px',
+                  fontSize: 11,
+                  color: '#4c6ef5',
+                  lineHeight: 1.2,
+                }}
+              >
+                {expanded ? 'Minimize' : 'Expand'}
+              </span>
+            ) : null}
+          </span>
+        </button>
       </header>
 
       <p style={{ margin: '4px 0 10px', opacity: 0.75, fontSize: 12 }}>{lane.model}</p>
@@ -211,11 +250,8 @@ export const CompareLaneCard = ({
         </div>
       ) : null}
 
-      {lane.status === 'ok' && lane.extractionV2 && lane.debug ? (
-        <div
-          data-testid={`compare-lane-success-${lane.laneId}`}
-          style={{ display: 'grid', gap: 10 }}
-        >
+      {lane.status === 'ok' && lane.extractionV2 && lane.debug && !expanded ? (
+        <div style={{ display: 'grid', gap: 10 }}>
           <div style={{ fontSize: 13, display: 'grid', gap: 4 }}>
             <div>
               <strong>Title:</strong> {laneExtraction?.title}
@@ -232,25 +268,29 @@ export const CompareLaneCard = ({
               <strong>Summary:</strong> {laneExtraction?.summary}
             </div>
           </div>
-          <details>
-            <summary>Open Full Extraction</summary>
-            <div
-              style={{
-                marginTop: 8,
-                maxHeight: 520,
-                overflow: 'auto',
-                border: '1px solid #d0d7de',
-                borderRadius: 8,
-                padding: 8,
-              }}
-            >
-              <ExtractionView
-                extractionV2={lane.extractionV2}
-                sourceText={sourceText}
-                debug={lane.debug}
-              />
-            </div>
-          </details>
+        </div>
+      ) : null}
+
+      {lane.status === 'ok' && lane.extractionV2 && lane.debug && expanded ? (
+        <div
+          data-testid={`compare-lane-success-${lane.laneId}`}
+          style={{
+            marginTop: 8,
+            maxHeight: 680,
+            overflow: 'auto',
+            border: '1px solid #d0d7de',
+            borderRadius: 8,
+            padding: 8,
+          }}
+        >
+          <ExtractionView
+            extractionV2={lane.extractionV2}
+            sourceText={sourceText}
+            debug={lane.debug}
+            showDebugActions={false}
+            showSegments={false}
+            layoutMode="compact"
+          />
         </div>
       ) : null}
     </article>
