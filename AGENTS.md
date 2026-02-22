@@ -102,6 +102,7 @@
 - Extraction UI convention: renderer must not display segment cards/lists; segment data may remain in debug payloads/contracts only.
 - History compare convention: extraction history entries originating from A/B compare must preserve the full lane set (including skipped/error lanes) and render auto-expanded lane cards matching the live compare presentation.
 - V1 deprecation convention: extraction V1 payloads/types/debug fields are removed from API/runtime/UI; only V2 extraction contracts are supported.
+- Worktree convention: worktrees are optional; direct commits in the primary repository worktree are allowed when preferred to reduce workflow overhead.
 
 ## Convention Intake Process
 When a new user convention appears:

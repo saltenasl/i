@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ExtractionView } from '../extraction/View.js';
 import type { CompareLaneUi } from './CompareLaneCard.js';
 import { compareLaneMeta, compareLaneOrder, splitLaneErrorMessage } from './CompareLaneCard.js';
@@ -33,8 +34,11 @@ export const CompareTimeline = ({
           width: '100%',
           gap: 12,
           alignItems: 'start',
-          gridTemplateColumns: `repeat(${activeLanes.length}, 1fr)`,
+          gridAutoFlow: 'column',
+          gridAutoColumns: 'minmax(100%, 100%)',
           overflowX: 'auto',
+          overscrollBehaviorX: 'contain',
+          scrollSnapType: 'x mandatory',
         }}
       >
         {activeLanes.map((lane) => (
@@ -53,10 +57,13 @@ const CompareColumn = ({
   sourceText: string;
 }) => {
   const laneLabel = compareLaneMeta[lane.laneId];
+  const [expanded, setExpanded] = useState(false);
   const laneError =
     lane.status === 'error' || lane.status === 'skipped'
       ? splitLaneErrorMessage(lane.errorMessage)
       : undefined;
+
+  const canExpand = lane.status === 'ok' && lane.extractionV2 && lane.debug;
 
   return (
     <article
@@ -69,9 +76,13 @@ const CompareColumn = ({
         borderRadius: 12,
         background: '#fff',
         overflow: 'hidden',
+        scrollSnapAlign: 'start',
       }}
     >
       <header
+        role={canExpand ? 'button' : undefined}
+        tabIndex={canExpand ? 0 : undefined}
+        aria-expanded={canExpand ? expanded : undefined}
         style={{
           position: 'sticky',
           top: 0,
@@ -82,6 +93,21 @@ const CompareColumn = ({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          cursor: canExpand ? 'pointer' : 'default',
+        }}
+        onClick={() => {
+          if (canExpand) {
+            setExpanded((prev) => !prev);
+          }
+        }}
+        onKeyDown={(event) => {
+          if (!canExpand) {
+            return;
+          }
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            setExpanded((prev) => !prev);
+          }
         }}
       >
         <div>
@@ -107,73 +133,111 @@ const CompareColumn = ({
           <span data-testid={`compare-lane-status-${lane.laneId}`} style={{ fontSize: 12 }}>
             {lane.status}
           </span>
+          {canExpand ? (
+            <button
+              data-testid={`compare-lane-toggle-${lane.laneId}`}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded((prev) => !prev);
+              }}
+              style={{
+                background: 'none',
+                border: '1px solid #d0d7de',
+                borderRadius: 6,
+                padding: '2px 8px',
+                fontSize: 11,
+                cursor: 'pointer',
+                color: '#4c6ef5',
+              }}
+            >
+              {expanded ? 'Minimize' : 'Expand'}
+            </button>
+          ) : null}
         </div>
       </header>
 
-      <div style={{ padding: 14 }}>
-        {lane.status === 'loading' ? (
-          <div
-            data-testid={`compare-lane-loading-${lane.laneId}`}
-            style={{ display: 'flex', gap: 8, padding: 10 }}
+      {lane.status === 'loading' ? (
+        <div
+          data-testid={`compare-lane-loading-${lane.laneId}`}
+          style={{ display: 'flex', gap: 8, padding: '10px 14px' }}
+        >
+          <span
+            className="lane-spinner"
+            style={{
+              width: 12,
+              height: 12,
+              borderRadius: '50%',
+              border: '2px solid #d0d7de',
+              borderTopColor: '#4c6ef5',
+              animation: 'lane-spin 0.8s linear infinite',
+              marginTop: 3,
+            }}
+          />
+          <span style={{ fontSize: 13 }}>Running {laneLabel.label}...</span>
+        </div>
+      ) : null}
+
+      {lane.status === 'error' || lane.status === 'skipped' ? (
+        <div style={{ padding: 14, display: 'grid', gap: 8 }}>
+          <p
+            data-testid={`compare-lane-message-${lane.laneId}`}
+            style={{ margin: 0, fontSize: 13, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
           >
-            <span
-              className="lane-spinner"
-              style={{
-                width: 12,
-                height: 12,
-                borderRadius: '50%',
-                border: '2px solid #d0d7de',
-                borderTopColor: '#4c6ef5',
-                animation: 'lane-spin 0.8s linear infinite',
-                marginTop: 3,
-              }}
-            />
-            <span style={{ fontSize: 13 }}>Running {laneLabel.label}...</span>
-          </div>
-        ) : null}
+            {laneError?.preview}
+          </p>
+          {laneError?.details ? (
+            <details>
+              <summary>Show Full Error</summary>
+              <pre
+                data-testid={`compare-lane-message-full-${lane.laneId}`}
+                style={{
+                  marginTop: 8,
+                  maxHeight: 220,
+                  overflow: 'auto',
+                  whiteSpace: 'pre-wrap',
+                  overflowWrap: 'anywhere',
+                  border: '1px solid #d0d7de',
+                  borderRadius: 8,
+                  padding: 8,
+                }}
+              >
+                {laneError.details}
+              </pre>
+            </details>
+          ) : null}
+        </div>
+      ) : null}
 
-        {lane.status === 'error' || lane.status === 'skipped' ? (
-          <div style={{ display: 'grid', gap: 8 }}>
-            <p
-              data-testid={`compare-lane-message-${lane.laneId}`}
-              style={{ margin: 0, fontSize: 13, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
-            >
-              {laneError?.preview}
-            </p>
-            {laneError?.details ? (
-              <details>
-                <summary>Show Full Error</summary>
-                <pre
-                  data-testid={`compare-lane-message-full-${lane.laneId}`}
-                  style={{
-                    marginTop: 8,
-                    maxHeight: 220,
-                    overflow: 'auto',
-                    whiteSpace: 'pre-wrap',
-                    overflowWrap: 'anywhere',
-                    border: '1px solid #d0d7de',
-                    borderRadius: 8,
-                    padding: 8,
-                  }}
-                >
-                  {laneError.details}
-                </pre>
-              </details>
-            ) : null}
+      {lane.status === 'ok' && lane.extractionV2 && lane.debug && !expanded ? (
+        <div style={{ padding: '10px 14px', fontSize: 13, display: 'grid', gap: 4 }}>
+          <div>
+            <strong>Title:</strong> {lane.extractionV2?.title}
           </div>
-        ) : null}
+          <div>
+            <strong>Sentiment:</strong> {lane.extractionV2?.sentiment}
+          </div>
+          <div>
+            <strong>Entities:</strong> {lane.extractionV2?.entities.length ?? 0} |{' '}
+            <strong>Facts:</strong> {lane.extractionV2?.facts.length ?? 0} |{' '}
+            <strong>Relations:</strong> {lane.extractionV2?.relations.length ?? 0}
+          </div>
+          <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+            <strong>Summary:</strong> {lane.extractionV2?.summary}
+          </div>
+        </div>
+      ) : null}
 
-        {lane.status === 'ok' && lane.extractionV2 && lane.debug ? (
-          <div data-testid={`compare-lane-success-${lane.laneId}`}>
-            <ExtractionView
-              extractionV2={lane.extractionV2}
-              sourceText={sourceText}
-              debug={lane.debug}
-              showDebugActions={false}
-            />
-          </div>
-        ) : null}
-      </div>
+      {lane.status === 'ok' && lane.extractionV2 && lane.debug && expanded ? (
+        <div data-testid={`compare-lane-success-${lane.laneId}`} style={{ padding: 14 }}>
+          <ExtractionView
+            extractionV2={lane.extractionV2}
+            sourceText={sourceText}
+            debug={lane.debug}
+            showDebugActions={false}
+          />
+        </div>
+      ) : null}
     </article>
   );
 };

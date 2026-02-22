@@ -78,12 +78,6 @@ export const ViewPage = ({ id }: { id: string }) => {
         </span>
       </div>
 
-      <ExtractionView
-        extractionV2={entry.extractionV2}
-        sourceText={entry.sourceText}
-        debug={entry.debug}
-      />
-
       {compareLanes.length > 0 ? (
         <CompareTimeline
           lanes={compareLanes}
@@ -91,7 +85,13 @@ export const ViewPage = ({ id }: { id: string }) => {
           completed={compareLanes.length}
           total={compareLaneOrder.length}
         />
-      ) : null}
+      ) : (
+        <ExtractionView
+          extractionV2={entry.extractionV2}
+          sourceText={entry.sourceText}
+          debug={entry.debug}
+        />
+      )}
     </section>
   );
 };
