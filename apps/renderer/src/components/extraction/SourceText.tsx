@@ -62,6 +62,44 @@ export const ExtractionSourceText = ({
             const entityId = entityNameSpan.id;
             const swatch = getEntitySwatch(entityId, entitySwatchById);
             const isActive = active.entityIds.has(entityId);
+            const tokenEnd = token.start + token.text.length;
+            const isEntityStart = token.start === entityNameSpan.start;
+            const isEntityEnd = tokenEnd === entityNameSpan.end;
+
+            let shadow = 'none';
+            if (isActive) {
+              const topShadow = `inset 0 2px 0 0 ${swatch.accent}`;
+              const bottomShadow = `inset 0 -2px 0 0 ${swatch.accent}`;
+              const leftShadow = isEntityStart ? `, inset 2px 0 0 0 ${swatch.accent}` : '';
+              const rightShadow = isEntityEnd ? `, inset -2px 0 0 0 ${swatch.accent}` : '';
+              shadow = `${topShadow}, ${bottomShadow}${leftShadow}${rightShadow}`;
+            }
+
+            // Also prioritize active evidence spans for the underline
+            let activeEvidenceUnderline = 'none';
+            if (evidenceSpans.length > 0) {
+              const activeUnderlineSpan = evidenceSpans.find((s) =>
+                isEvidenceSpanActive(s, active),
+              );
+              const topUnderlineSpan = activeUnderlineSpan ?? evidenceSpans[0];
+
+              if (topUnderlineSpan) {
+                const isUnderlineActive = isEvidenceSpanActive(topUnderlineSpan, active);
+                if (isUnderlineActive) {
+                  const underlineSwatch = getEvidenceSpanSwatch(
+                    topUnderlineSpan,
+                    entitySwatchById,
+                    factById,
+                    todoById,
+                    relations,
+                  );
+                  activeEvidenceUnderline = `2px ${getEvidenceLineStyle(topUnderlineSpan.type)} ${underlineSwatch.accent}`;
+                } else {
+                  activeEvidenceUnderline = `2px ${getEvidenceLineStyle(topUnderlineSpan.type)} transparent`;
+                }
+              }
+            }
+
             return (
               <span
                 key={`entity-${entityId}-${token.start}`}
@@ -71,19 +109,17 @@ export const ExtractionSourceText = ({
                 onMouseLeave={() => setHoverTarget(null)}
                 style={{
                   background: swatch.fill,
-                  borderRadius: 7,
-                  padding: '0 3px',
-                  boxShadow: isActive ? `0 0 0 2px ${swatch.accent} inset` : 'none',
+                  borderTopLeftRadius: isEntityStart ? 7 : 0,
+                  borderBottomLeftRadius: isEntityStart ? 7 : 0,
+                  borderTopRightRadius: isEntityEnd ? 7 : 0,
+                  borderBottomRightRadius: isEntityEnd ? 7 : 0,
+                  paddingLeft: isEntityStart ? 3 : 0,
+                  paddingRight: isEntityEnd ? 3 : 0,
+                  boxShadow: shadow,
                   cursor: 'pointer',
                   transition: 'box-shadow 0.08s ease',
-                  borderBottom: getEvidenceUnderline(
-                    evidenceSpans,
-                    entitySwatchById,
-                    factById,
-                    todoById,
-                    relations,
-                    active,
-                  ),
+                  borderBottom:
+                    activeEvidenceUnderline !== 'none' ? activeEvidenceUnderline : undefined,
                 }}
                 title={entityId}
               >
@@ -93,7 +129,9 @@ export const ExtractionSourceText = ({
           }
 
           if (evidenceSpans.length > 0) {
-            const topSpan = evidenceSpans[0];
+            let topSpan = evidenceSpans.find((s) => isEvidenceSpanActive(s, active));
+            if (!topSpan) topSpan = evidenceSpans[0];
+
             if (!topSpan) {
               return <span key={`plain-${token.start}`}>{token.text}</span>;
             }
@@ -142,26 +180,6 @@ const getEvidenceLineStyle = (type: string): string => {
     default:
       return 'solid';
   }
-};
-
-const getEvidenceUnderline = (
-  evidenceSpans: Array<{ type: string; id: string }>,
-  entitySwatchById: Map<string, EntitySwatch>,
-  factById: Map<string, Extraction['facts'][number]>,
-  todoById: Map<string, Extraction['todos'][number]>,
-  relations: Extraction['relations'],
-  active: ActiveHighlights,
-): string | undefined => {
-  if (evidenceSpans.length === 0) {
-    return undefined;
-  }
-  const topSpan = evidenceSpans[0];
-  if (!topSpan) {
-    return undefined;
-  }
-  const isActive = isEvidenceSpanActive(topSpan, active);
-  const swatch = getEvidenceSpanSwatch(topSpan, entitySwatchById, factById, todoById, relations);
-  return `2px ${getEvidenceLineStyle(topSpan.type)} ${isActive ? swatch.accent : 'transparent'}`;
 };
 
 const isEvidenceSpanActive = (
