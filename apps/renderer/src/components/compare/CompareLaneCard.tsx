@@ -260,9 +260,9 @@ export const CompareLaneCard = ({
               <strong>Sentiment:</strong> {laneExtraction?.sentiment}
             </div>
             <div>
-              <strong>Entities:</strong> {laneExtraction?.entities.length ?? 0} |{' '}
-              <strong>Facts:</strong> {laneExtraction?.facts.length ?? 0} |{' '}
-              <strong>Relations:</strong> {laneExtraction?.relations.length ?? 0}
+              <strong>Entities:</strong> {laneExtraction?.entities?.length ?? 0} |{' '}
+              <strong>Facts:</strong> {laneExtraction?.facts?.length ?? 0} |{' '}
+              <strong>Relations:</strong> {laneExtraction?.relations?.length ?? 0}
             </div>
             <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
               <strong>Summary:</strong> {laneExtraction?.summary}
