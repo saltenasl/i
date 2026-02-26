@@ -84,13 +84,15 @@ export const createLoadingLane = (laneId: ExtractionLaneId): CompareLaneUi => {
 };
 
 export const toLaneUi = (lane: ExtractionLaneResult): CompareLaneUi => {
+  // biome-ignore lint/suspicious/noExplicitAny: Support legacy extractionV2 key from older history entries
+  const extraction = lane.extraction ?? (lane as any).extractionV2;
   return {
     laneId: lane.laneId,
     provider: lane.provider,
     model: lane.model,
     status: lane.status,
     durationMs: lane.durationMs,
-    ...(lane.extraction ? { extraction: lane.extraction } : {}),
+    ...(extraction ? { extraction } : {}),
     ...(lane.debug ? { debug: lane.debug } : {}),
     ...(lane.errorMessage ? { errorMessage: lane.errorMessage } : {}),
   };
