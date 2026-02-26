@@ -8,7 +8,7 @@ export const ExtractionMetadata = ({
   extraction: Extraction;
   compact?: boolean;
 }) => {
-  const sentColor = sentimentColors[extraction.sentiment];
+  const sentColor = sentimentColors[extraction.sentiment] ?? sentimentColors.neutral;
   const clamp3 = {
     display: '-webkit-box',
     WebkitLineClamp: 3,
