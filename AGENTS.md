@@ -92,17 +92,17 @@
 - Sentiment convention: use per-segment sentiment as primary query surface; top-level sentiment is a rollup and uses `varied` when segments differ.
 - Fact language convention: predicates should be concise natural language (spaces), not snake_case, for cross-model consistency and UI readability.
 - UI convention: extraction page must show original source text with color-matched entity highlights and excerpt snippets in the entity list.
-- Debugging convention: extraction UI must provide a one-click debug export containing prompt, raw model output, validated/final payloads, segmentation trace, runtime metadata, and fallback/error info.
+- Debugging convention: extraction UI must provide a one-click debug export containing prompt, raw model output, validated/final payloads, segmentation trace, runtime metadata, and fallback/error info, available both in the history list and directly inside individual A/B compare lanes.
 - E2E extraction convention: keep E2E assertions at smoke level for extraction UI controls (textarea + submit, fresh + seeded profiles), not model-inference content assertions.
 - Runtime constraint convention: extraction must use local llama.cpp + local GGUF only (no Python), with first-call auto-download into `~/.auto-extract`.
 - Latency target convention: optimize extraction for practical local responsiveness with a working target around <=2s on supported hardware/model, while prioritizing correctness and grounding over unrealistic token-speed assumptions.
 - A/B benchmarking convention: extraction compare mode may call cloud providers via AI SDK (Anthropic + OpenAI) in parallel with local llama for side-by-side evaluation, while preserving the existing local-only `extract.run` path for compatibility.
-- Task extraction convention: detect TODO/task intent from note text and represent it as self-owned grounded facts when present.
+- Task extraction convention: detect TODO/task/actionable intent from note text and represent it EXPLICITLY as objects in the `todos` array in the Extraction schema, preventing them from being miscategorized as standard facts.
 - Segmentation convention: segments are additive debug metadata only; facts are the primary structured surface and must remain complete without segment reliance.
 - Extraction UI convention: renderer must not display segment cards/lists; segment data may remain in debug payloads/contracts only.
 - History compare convention: extraction history entries originating from A/B compare must preserve the full lane set (including skipped/error lanes) and render auto-expanded lane cards matching the live compare presentation.
 - Compare density convention: A/B compare lanes use compact widget-style extraction cards sized for high information density, favoring dense row previews and hover/active expansion over block-level scrolling.
-- Compare expansion convention: each compare lane expands/minimizes the full lane content in a single lane-level action (no nested "open full extraction" step).
+- Compare expansion convention: each compare lane expands/minimizes the full lane content in a single lane-level action (no nested "open full extraction" step), and newly generated successful lanes should default to an expanded state for immediate feedback.
 - Compare compact row convention: in compact compare widgets, prefer dense collapsed item rows that expand on hover/active state over block-level scroll containers when presenting entities/facts/relations/groups.
 - V1 deprecation convention: extraction V1 payloads/types/debug fields are removed from API/runtime/UI; only V2 extraction contracts are supported.
 - Worktree convention: worktrees are optional; direct commits in the primary repository worktree are allowed when preferred to reduce workflow overhead.
