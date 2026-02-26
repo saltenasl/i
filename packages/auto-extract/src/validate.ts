@@ -141,22 +141,16 @@ const normalizeExtractionInput = (raw: unknown): unknown => {
     normalizeObjectWithNumericKeys(entry, ['intensity']),
   );
   normalized.entities = toArray(parsedRaw.entities).map((entry) =>
-    normalizeObjectWithNumericKeys(entry, [
-      'nameStart',
-      'nameEnd',
-      'evidenceStart',
-      'evidenceEnd',
-      'confidence',
-    ]),
+    normalizeObjectWithNumericKeys(entry, ['confidence']),
   );
   normalized.facts = toArray(parsedRaw.facts).map((entry) =>
-    normalizeObjectWithNumericKeys(entry, ['evidenceStart', 'evidenceEnd', 'confidence']),
+    normalizeObjectWithNumericKeys(entry, ['confidence']),
   );
   normalized.relations = toArray(parsedRaw.relations).map((entry) =>
-    normalizeObjectWithNumericKeys(entry, ['evidenceStart', 'evidenceEnd', 'confidence']),
+    normalizeObjectWithNumericKeys(entry, ['confidence']),
   );
   normalized.todos = toArray(parsedRaw.todos).map((entry) =>
-    normalizeObjectWithNumericKeys(entry, ['evidenceStart', 'evidenceEnd', 'confidence']),
+    normalizeObjectWithNumericKeys(entry, ['confidence']),
   );
   normalized.groups = toArray(parsedRaw.groups).map((entry) => {
     if (!isObject(entry)) {
@@ -276,78 +270,38 @@ const parseJsonObjectFromOutput = (rawOutput: string): unknown => {
   }
 };
 
-const findClosestMatchStart = (text: string, value: string, hintStart: number): number => {
-  if (!value) {
-    return -1;
-  }
-
-  const matches: number[] = [];
-  let fromIndex = 0;
-
-  while (fromIndex <= text.length) {
-    const index = text.indexOf(value, fromIndex);
-    if (index < 0) {
-      break;
-    }
-    matches.push(index);
-    fromIndex = index + 1;
-  }
-
-  if (matches.length === 0) {
-    return -1;
-  }
-
-  let best = matches[0] ?? -1;
-  let bestDistance = Math.abs(best - hintStart);
-
-  for (const candidate of matches) {
-    const distance = Math.abs(candidate - hintStart);
-    if (distance < bestDistance) {
-      best = candidate;
-      bestDistance = distance;
-    }
-  }
-
-  return best;
-};
-
-const normalizeSpan = (
+const resolveExactSpan = (
   text: string,
-  value: string,
-  start: number,
-  end: number,
+  quote: string | undefined,
 ): { start: number; end: number } | null => {
-  if (
-    !Number.isInteger(start) ||
-    !Number.isInteger(end) ||
-    start < 0 ||
-    end <= start ||
-    end > text.length
-  ) {
-    const repairedStart = findClosestMatchStart(text, value, Math.max(0, start));
-    if (repairedStart < 0) {
-      return null;
-    }
-
-    return {
-      start: repairedStart,
-      end: repairedStart + value.length,
-    };
-  }
-
-  if (text.slice(start, end) === value) {
-    return { start, end };
-  }
-
-  const repairedStart = findClosestMatchStart(text, value, start);
-  if (repairedStart < 0) {
+  if (!quote) {
     return null;
   }
 
-  return {
-    start: repairedStart,
-    end: repairedStart + value.length,
-  };
+  let start = text.indexOf(quote);
+  if (start < 0) {
+    start = text.toLowerCase().indexOf(quote.toLowerCase());
+  }
+
+  if (start < 0) {
+    return null;
+  }
+
+  return { start, end: start + quote.length };
+};
+
+const findPreferredNarratorSpan = (text: string): { start: number; end: number } | null => {
+  const singular = /\b(?:I|i|me|my|mine)\b/.exec(text);
+  if (singular && singular.index !== undefined) {
+    return { start: singular.index, end: singular.index + singular[0].length };
+  }
+
+  const plural = /\b(?:we|our|us)\b/.exec(text);
+  if (plural && plural.index !== undefined) {
+    return { start: plural.index, end: plural.index + plural[0].length };
+  }
+
+  return null;
 };
 
 const toTaxonomyName = (name: string): TaxonomyName | null => {
@@ -582,41 +536,44 @@ export const validateExtractionV2 = (text: string, rawInput: unknown): Extractio
       return [];
     }
 
-    const nameStart = parseNumber(entityRaw.nameStart, `entities[${index}].nameStart`);
-    const nameEnd = parseNumber(entityRaw.nameEnd, `entities[${index}].nameEnd`);
     const confidence = parseNumber(entityRaw.confidence, `entities[${index}].confidence`);
 
     if (confidence < 0 || confidence > 1) {
       return [];
     }
 
-    const normalizedNameSpan = normalizeSpan(text, name, nameStart, nameEnd);
-    if (!normalizedNameSpan) {
+    let normalizedNameSpan: { start: number; end: number } | null = null;
+    let fallbackToEgleOrI = false;
+
+    if (id === 'ent_self' && name === 'I') {
+      const narratorSpan = findPreferredNarratorSpan(text);
+      if (narratorSpan) {
+        normalizedNameSpan = narratorSpan;
+      } else {
+        fallbackToEgleOrI = true;
+      }
+    } else {
+      normalizedNameSpan = resolveExactSpan(text, name);
+    }
+
+    if (!normalizedNameSpan && !fallbackToEgleOrI) {
       return [];
     }
 
     const context = parseOptionalString(entityRaw.context, `entities[${index}].context`);
+    const evidenceText = parseOptionalString(
+      entityRaw.evidenceText,
+      `entities[${index}].evidenceText`,
+    );
 
-    let evidenceStart = entityRaw.evidenceStart as number | undefined;
-    let evidenceEnd = entityRaw.evidenceEnd as number | undefined;
+    let evidenceStart: number | undefined;
+    let evidenceEnd: number | undefined;
 
-    if (evidenceStart !== undefined && evidenceEnd !== undefined) {
-      if (!Number.isFinite(evidenceStart) || !Number.isFinite(evidenceEnd)) {
-        evidenceStart = undefined;
-        evidenceEnd = undefined;
-      }
-
-      if (
-        evidenceStart !== undefined &&
-        evidenceEnd !== undefined &&
-        (!Number.isInteger(evidenceStart) ||
-          !Number.isInteger(evidenceEnd) ||
-          evidenceStart < 0 ||
-          evidenceEnd <= evidenceStart ||
-          evidenceEnd > text.length)
-      ) {
-        evidenceStart = undefined;
-        evidenceEnd = undefined;
+    if (evidenceText) {
+      const evSpan = resolveExactSpan(text, evidenceText);
+      if (evSpan) {
+        evidenceStart = evSpan.start;
+        evidenceEnd = evSpan.end;
       }
     }
 
@@ -625,8 +582,8 @@ export const validateExtractionV2 = (text: string, rawInput: unknown): Extractio
         id,
         name,
         type: typeRaw as EntityType,
-        nameStart: normalizedNameSpan.start,
-        nameEnd: normalizedNameSpan.end,
+        nameStart: normalizedNameSpan ? normalizedNameSpan.start : 0,
+        nameEnd: normalizedNameSpan ? normalizedNameSpan.end : 0,
         ...(evidenceStart === undefined || evidenceEnd === undefined
           ? {}
           : { evidenceStart, evidenceEnd }),
@@ -651,19 +608,16 @@ export const validateExtractionV2 = (text: string, rawInput: unknown): Extractio
     const predicate = normalizePredicate(
       parseString(factRaw.predicate, `facts[${index}].predicate`),
     );
-    const evidenceStart = parseNumber(factRaw.evidenceStart, `facts[${index}].evidenceStart`);
-    const evidenceEnd = parseNumber(factRaw.evidenceEnd, `facts[${index}].evidenceEnd`);
+    const evidenceText = parseOptionalString(factRaw.evidenceText, `facts[${index}].evidenceText`);
     const confidence = parseNumber(factRaw.confidence, `facts[${index}].confidence`);
 
-    if (
-      !Number.isInteger(evidenceStart) ||
-      !Number.isInteger(evidenceEnd) ||
-      evidenceStart < 0 ||
-      evidenceEnd <= evidenceStart ||
-      evidenceEnd > text.length
-    ) {
+    const evSpan = resolveExactSpan(text, evidenceText);
+    if (!evSpan) {
       return [];
     }
+
+    const evidenceStart = evSpan.start;
+    const evidenceEnd = evSpan.end;
 
     if (!predicate) {
       return [];
@@ -744,25 +698,19 @@ export const validateExtractionV2 = (text: string, rawInput: unknown): Extractio
       return [];
     }
 
-    const evidenceStartRaw = relationRaw.evidenceStart;
-    const evidenceEndRaw = relationRaw.evidenceEnd;
+    const evidenceText = parseOptionalString(
+      relationRaw.evidenceText,
+      `relations[${index}].evidenceText`,
+    );
 
     let evidenceStart: number | undefined;
     let evidenceEnd: number | undefined;
 
-    if (evidenceStartRaw != null && evidenceEndRaw != null) {
-      evidenceStart = parseNumber(evidenceStartRaw, `relations[${index}].evidenceStart`);
-      evidenceEnd = parseNumber(evidenceEndRaw, `relations[${index}].evidenceEnd`);
-
-      if (
-        !Number.isInteger(evidenceStart) ||
-        !Number.isInteger(evidenceEnd) ||
-        evidenceStart < 0 ||
-        evidenceEnd <= evidenceStart ||
-        evidenceEnd > text.length
-      ) {
-        evidenceStart = undefined;
-        evidenceEnd = undefined;
+    if (evidenceText) {
+      const evSpan = resolveExactSpan(text, evidenceText);
+      if (evSpan) {
+        evidenceStart = evSpan.start;
+        evidenceEnd = evSpan.end;
       }
     }
 
@@ -787,19 +735,19 @@ export const validateExtractionV2 = (text: string, rawInput: unknown): Extractio
 
         const id = parseString(todoRaw.id, `todos[${index}].id`);
         const description = parseString(todoRaw.description, `todos[${index}].description`);
-        const evidenceStart = parseNumber(todoRaw.evidenceStart, `todos[${index}].evidenceStart`);
-        const evidenceEnd = parseNumber(todoRaw.evidenceEnd, `todos[${index}].evidenceEnd`);
+        const evidenceText = parseOptionalString(
+          todoRaw.evidenceText,
+          `todos[${index}].evidenceText`,
+        );
         const confidence = parseNumber(todoRaw.confidence, `todos[${index}].confidence`);
 
-        if (
-          !Number.isInteger(evidenceStart) ||
-          !Number.isInteger(evidenceEnd) ||
-          evidenceStart < 0 ||
-          evidenceEnd <= evidenceStart ||
-          evidenceEnd > text.length
-        ) {
+        const evSpan = resolveExactSpan(text, evidenceText);
+        if (!evSpan) {
           return [];
         }
+
+        const evidenceStart = evSpan.start;
+        const evidenceEnd = evSpan.end;
 
         if (confidence < 0 || confidence > 1) {
           return [];

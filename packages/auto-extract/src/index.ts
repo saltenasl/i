@@ -63,25 +63,12 @@ const extractionV2JsonSchema = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: [
-          'id',
-          'name',
-          'type',
-          'nameStart',
-          'nameEnd',
-          'evidenceStart',
-          'evidenceEnd',
-          'context',
-          'confidence',
-        ],
+        required: ['id', 'name', 'type', 'evidenceText', 'context', 'confidence'],
         properties: {
           id: { type: 'string' },
           name: { type: 'string' },
           type: { type: 'string', enum: ['person', 'org', 'tool', 'place', 'concept', 'event'] },
-          nameStart: { type: 'integer' },
-          nameEnd: { type: 'integer' },
-          evidenceStart: { type: ['integer', 'null'] },
-          evidenceEnd: { type: ['integer', 'null'] },
+          evidenceText: { type: ['string', 'null'] },
           context: { type: ['string', 'null'] },
           confidence: { type: 'number' },
         },
@@ -100,8 +87,7 @@ const extractionV2JsonSchema = {
           'predicate',
           'objectEntityId',
           'objectText',
-          'evidenceStart',
-          'evidenceEnd',
+          'evidenceText',
           'confidence',
         ],
         properties: {
@@ -112,8 +98,7 @@ const extractionV2JsonSchema = {
           predicate: { type: 'string' },
           objectEntityId: { type: ['string', 'null'] },
           objectText: { type: ['string', 'null'] },
-          evidenceStart: { type: 'integer' },
-          evidenceEnd: { type: 'integer' },
+          evidenceText: { type: 'string' },
           confidence: { type: 'number' },
         },
       },
@@ -123,20 +108,12 @@ const extractionV2JsonSchema = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: [
-          'fromEntityId',
-          'toEntityId',
-          'type',
-          'evidenceStart',
-          'evidenceEnd',
-          'confidence',
-        ],
+        required: ['fromEntityId', 'toEntityId', 'type', 'evidenceText', 'confidence'],
         properties: {
           fromEntityId: { type: 'string' },
           toEntityId: { type: 'string' },
           type: { type: 'string' },
-          evidenceStart: { type: ['integer', 'null'] },
-          evidenceEnd: { type: ['integer', 'null'] },
+          evidenceText: { type: ['string', 'null'] },
           confidence: { type: 'number' },
         },
       },
@@ -146,13 +123,12 @@ const extractionV2JsonSchema = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['id', 'description', 'evidenceStart', 'evidenceEnd', 'confidence'],
+        required: ['id', 'description', 'evidenceText', 'confidence'],
         properties: {
           id: { type: 'string' },
           description: { type: 'string' },
           assigneeEntityId: { type: ['string', 'null'] },
-          evidenceStart: { type: 'integer' },
-          evidenceEnd: { type: 'integer' },
+          evidenceText: { type: 'string' },
           confidence: { type: 'number' },
         },
       },
@@ -900,8 +876,10 @@ const ensureSelfOwnership = (extraction: Extraction, text: string): Extraction =
     );
     const startsWithThirdPerson = /^\s*(?:he|she|they|it|his|her|their|egle)\b/i.test(evidence);
     const subjectEntityId = remapEntityId(fact.subjectEntityId);
-    const ownerFromSubject =
-      subjectEntityId && entityIdSet.has(subjectEntityId) ? subjectEntityId : undefined;
+    let ownerFromSubject: string | undefined = undefined;
+    if (subjectEntityId && entityIdSet.has(subjectEntityId)) {
+      ownerFromSubject = subjectEntityId;
+    }
     const ownerFromFact = remapEntityId(fact.ownerEntityId);
     const objectEntityId = remapEntityId(fact.objectEntityId);
 
@@ -980,65 +958,10 @@ const ensureSelfOwnership = (extraction: Extraction, text: string): Extraction =
   };
 };
 
-const isDrivingPredicate = (predicate: string): boolean => {
-  return /\bdriv(?:e|ing)\b/i.test(predicate);
-};
-
-const removeConflictingCollectiveDrivingFacts = (
-  extraction: Extraction,
-  text: string,
-): Extraction => {
-  const hasExplicitOtherDriver = extraction.facts.some(
-    (fact) => fact.ownerEntityId !== NARRATOR_ENTITY_ID && isDrivingPredicate(fact.predicate),
-  );
-
-  if (!hasExplicitOtherDriver) {
-    return extraction;
-  }
-
-  const facts = extraction.facts.filter((fact) => {
-    if (fact.ownerEntityId !== NARRATOR_ENTITY_ID || !isDrivingPredicate(fact.predicate)) {
-      return true;
-    }
-
-    const evidence = text.slice(fact.evidenceStart, fact.evidenceEnd);
-    const explicitSelfDriver = /^\s*(?:i|i'm|ive|i’ve)\s+(?:was\s+)?driv(?:e|ing)\b/i.test(
-      evidence,
-    );
-    if (explicitSelfDriver) {
-      return true;
-    }
-
-    const collectivePronounDriver = /^\s*(?:we|our|us)\s+(?:were\s+)?driv(?:e|ing)\b/i.test(
-      evidence,
-    );
-    return !collectivePronounDriver;
-  });
-
-  if (facts.length === extraction.facts.length) {
-    return extraction;
-  }
-
-  const factIdSet = new Set(facts.map((fact) => fact.id));
-  return {
-    ...extraction,
-    facts,
-    groups: extraction.groups.map((group) => ({
-      ...group,
-      factIds: group.factIds.filter((factId) => factIdSet.has(factId)),
-    })),
-    segments: extraction.segments.map((segment) => ({
-      ...segment,
-      factIds: segment.factIds.filter((factId) => factIdSet.has(factId)),
-    })),
-  };
-};
-
 export const postProcessExtractionV2 = (extraction: Extraction, text: string): Extraction => {
   const owned = ensureSelfOwnership(extraction, text);
   const withTodos = enrichTodoFacts(owned, text);
-  const conflictCleaned = removeConflictingCollectiveDrivingFacts(withTodos, text);
-  return ensureNotetakerTerminology(conflictCleaned);
+  return ensureNotetakerTerminology(withTodos);
 };
 
 const enrichTodoFacts = (extraction: Extraction, text: string): Extraction => {

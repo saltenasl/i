@@ -100,6 +100,8 @@ const createValidExtractionV2 = (): Extraction => {
         fromEntityId: 'ent-egle',
         toEntityId: 'ent-klaipeda',
         type: 'drove_to',
+        evidenceStart: drivingStart,
+        evidenceEnd: drivingStart + 'Egle was driving'.length,
         confidence: 0.82,
       },
     ],
@@ -141,23 +143,53 @@ const createValidExtractionV2 = (): Extraction => {
   };
 };
 
+const createRawExtractionV2 = () => {
+  const valid = createValidExtractionV2();
+
+  const rawEntities = valid.entities.map((e) => ({
+    ...e,
+    evidenceText:
+      e.evidenceStart !== undefined ? V2_TEXT.slice(e.evidenceStart, e.evidenceEnd) : undefined,
+  }));
+
+  const rawFacts = valid.facts.map((f) => ({
+    ...f,
+    evidenceText: V2_TEXT.slice(f.evidenceStart, f.evidenceEnd),
+  }));
+
+  const rawRelations = valid.relations.map((r) => ({
+    ...r,
+    evidenceText:
+      r.evidenceStart !== undefined && r.evidenceEnd !== undefined
+        ? V2_TEXT.slice(r.evidenceStart, r.evidenceEnd)
+        : undefined,
+  }));
+
+  return {
+    ...valid,
+    entities: rawEntities,
+    facts: rawFacts,
+    relations: rawRelations,
+  };
+};
+
 describe('validateExtractionV2', () => {
   it('keeps ownership and perspective fields', () => {
-    const extraction = validateExtractionV2(V2_TEXT, createValidExtractionV2());
+    const extraction = validateExtractionV2(V2_TEXT, createRawExtractionV2());
     const scared = extraction.facts.find((fact) => fact.id === 'fact-scared');
     expect(scared?.ownerEntityId).toBe('ent-egle');
     expect(scared?.perspective).toBe('other');
   });
 
   it('supports notetaker self-owned facts', () => {
-    const extraction = validateExtractionV2(V2_TEXT, createValidExtractionV2());
+    const extraction = validateExtractionV2(V2_TEXT, createRawExtractionV2());
     const call = extraction.facts.find((fact) => fact.id === 'fact-call');
     expect(call?.ownerEntityId).toBe('ent-self');
     expect(call?.perspective).toBe('self');
   });
 
   it('normalizes sentiment and groups', () => {
-    const extraction = createValidExtractionV2();
+    const extraction = createRawExtractionV2();
     extraction.sentiment = 'varied';
     extraction.groups = [
       { name: 'driving events', entityIds: ['ent-egle'], factIds: ['fact-scared'] },
@@ -168,11 +200,12 @@ describe('validateExtractionV2', () => {
   });
 
   it('drops malformed relations while keeping extraction valid', () => {
-    const extraction = createValidExtractionV2();
+    const extraction = createRawExtractionV2();
     extraction.relations.push({
       fromEntityId: 'missing',
       toEntityId: 'ent-klaipeda',
       type: 'invalid',
+      evidenceText: undefined,
       confidence: 0.5,
     });
 
@@ -279,7 +312,7 @@ describe('postProcessExtractionV2', () => {
     expect(notetaker?.name).toBe('I');
     expect(notetaker?.context).toContain('notetaker');
     expect(callFact?.ownerEntityId).toBe('ent_self');
-    expect(selfDrivingFact).toBeUndefined();
+    expect(selfDrivingFact?.ownerEntityId).toBe('ent_self');
   });
 
   it('replaces narrator wording with notetaker wording', () => {
