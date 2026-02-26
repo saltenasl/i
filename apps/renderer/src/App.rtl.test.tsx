@@ -110,7 +110,7 @@ describe('App (RTL with real backend implementation)', () => {
       createBackendHandlers({
         db: harness.db,
         runExtractionBundle: async () => ({
-          extractionV2: {
+          extraction: {
             title: 'Winter Drive',
             noteType: 'personal',
             summary: 'I called maintenance while Egle drove through scary icy roads.',
@@ -212,7 +212,7 @@ describe('App (RTL with real backend implementation)', () => {
             inputText: text,
             prompt: 'prompt',
             rawModelOutput: '{...}',
-            validatedExtractionV2BeforeSegmentation: {
+            validatedExtractionBeforeSegmentation: {
               title: 'Winter Drive',
               noteType: 'personal',
               summary: 'I called maintenance while Egle drove through scary icy roads.',
@@ -226,7 +226,7 @@ describe('App (RTL with real backend implementation)', () => {
               groups: [],
               segments: [],
             },
-            finalExtractionV2: {
+            finalExtraction: {
               title: 'Winter Drive',
               noteType: 'personal',
               summary: 'I called maintenance while Egle drove through scary icy roads.',
@@ -324,7 +324,7 @@ describe('App (RTL with real backend implementation)', () => {
               model: 'local-llama.cpp',
               status: 'ok',
               durationMs: 10,
-              extractionV2: {
+              extraction: {
                 title: 'Local',
                 noteType: 'personal',
                 summary: 'Local summary',
@@ -342,7 +342,7 @@ describe('App (RTL with real backend implementation)', () => {
                 inputText: text,
                 prompt: 'prompt',
                 rawModelOutput: '{}',
-                validatedExtractionV2BeforeSegmentation: {
+                validatedExtractionBeforeSegmentation: {
                   title: 'Local',
                   noteType: 'personal',
                   summary: 'Local summary',
@@ -356,7 +356,7 @@ describe('App (RTL with real backend implementation)', () => {
                   groups: [],
                   segments: [],
                 },
-                finalExtractionV2: {
+                finalExtraction: {
                   title: 'Local',
                   noteType: 'personal',
                   summary: 'Local summary',

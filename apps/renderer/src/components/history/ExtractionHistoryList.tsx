@@ -89,8 +89,8 @@ export const ExtractionHistoryList = ({
                     <div style={{ fontSize: 12, opacity: 0.75 }}>
                       {new Date(entry.createdAt).toLocaleString()}
                     </div>
-                    <div style={{ fontWeight: 700 }}>{entry.extractionV2.title}</div>
-                    <div style={{ fontSize: 13, opacity: 0.85 }}>{entry.extractionV2.summary}</div>
+                    <div style={{ fontWeight: 700 }}>{entry.extraction.title}</div>
+                    <div style={{ fontSize: 13, opacity: 0.85 }}>{entry.extraction.summary}</div>
                     <div style={{ fontSize: 12, marginTop: 4, opacity: 0.8 }}>
                       Prompt: {entry.prompt.slice(0, 120)}
                       {entry.prompt.length > 120 ? '...' : ''}

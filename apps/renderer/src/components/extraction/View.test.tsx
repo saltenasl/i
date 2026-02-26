@@ -1,4 +1,4 @@
-import type { ExtractionDebug, ExtractionV2 } from '@repo/api';
+import type { Extraction, ExtractionDebug } from '@repo/api';
 import { render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
@@ -12,7 +12,7 @@ const klaipedaStart = sourceText.indexOf('Klaipeda');
 const drivingStart = sourceText.indexOf('Egle was driving');
 const scaredStart = sourceText.indexOf('she was scared');
 
-const extraction: ExtractionV2 = {
+const extraction: Extraction = {
   title: 'Winter Drive',
   noteType: 'personal',
   summary: 'I called maintenance while Egle drove through scary icy roads.',
@@ -115,7 +115,7 @@ const debug: ExtractionDebug = {
   inputText: sourceText,
   prompt: 'prompt',
   rawModelOutput: '{...}',
-  validatedExtractionV2BeforeSegmentation: {
+  validatedExtractionBeforeSegmentation: {
     ...extraction,
     emotions: [],
     entities: [],
@@ -124,7 +124,7 @@ const debug: ExtractionDebug = {
     groups: [],
     segments: [],
   },
-  finalExtractionV2: {
+  finalExtraction: {
     ...extraction,
     emotions: [],
     entities: [],
@@ -146,7 +146,7 @@ const debug: ExtractionDebug = {
 
 describe('ExtractionView', () => {
   it('renders all sections with test data', () => {
-    render(<ExtractionView extractionV2={extraction} sourceText={sourceText} debug={debug} />);
+    render(<ExtractionView extraction={extraction} sourceText={sourceText} debug={debug} />);
 
     expect(screen.getByTestId('extraction-v2-result')).toBeInTheDocument();
     expect(screen.getByTestId('extraction-v2-metadata')).toHaveTextContent('Winter Drive');
@@ -163,7 +163,7 @@ describe('ExtractionView', () => {
 
   it('hovering entity highlights related facts, relations, groups, segments', async () => {
     const user = userEvent.setup();
-    render(<ExtractionView extractionV2={extraction} sourceText={sourceText} debug={debug} />);
+    render(<ExtractionView extraction={extraction} sourceText={sourceText} debug={debug} />);
 
     expect(screen.getByTestId('entity-row-ent_egle')).toHaveAttribute('data-active', 'false');
     expect(screen.getByTestId('fact-row-fact_scared')).toHaveAttribute('data-active', 'false');
@@ -185,7 +185,7 @@ describe('ExtractionView', () => {
 
   it('hovering fact highlights owner/subject/object entities and segments', async () => {
     const user = userEvent.setup();
-    render(<ExtractionView extractionV2={extraction} sourceText={sourceText} debug={debug} />);
+    render(<ExtractionView extraction={extraction} sourceText={sourceText} debug={debug} />);
 
     await user.hover(screen.getByTestId('fact-row-fact_scared'));
 
@@ -196,7 +196,7 @@ describe('ExtractionView', () => {
 
   it('hovering segment highlights all contained entities, facts, relations', async () => {
     const user = userEvent.setup();
-    render(<ExtractionView extractionV2={extraction} sourceText={sourceText} debug={debug} />);
+    render(<ExtractionView extraction={extraction} sourceText={sourceText} debug={debug} />);
 
     await user.hover(screen.getByTestId('segment-row-seg_2'));
 
@@ -209,7 +209,7 @@ describe('ExtractionView', () => {
 
   it('hovering relation highlights from/to entities and related facts', async () => {
     const user = userEvent.setup();
-    render(<ExtractionView extractionV2={extraction} sourceText={sourceText} debug={debug} />);
+    render(<ExtractionView extraction={extraction} sourceText={sourceText} debug={debug} />);
 
     await user.hover(screen.getByTestId('relation-row-0'));
 
@@ -221,7 +221,7 @@ describe('ExtractionView', () => {
 
   it('unhover deactivates everything', async () => {
     const user = userEvent.setup();
-    render(<ExtractionView extractionV2={extraction} sourceText={sourceText} debug={debug} />);
+    render(<ExtractionView extraction={extraction} sourceText={sourceText} debug={debug} />);
 
     await user.hover(screen.getByTestId('entity-row-ent_egle'));
     expect(screen.getByTestId('entity-row-ent_egle')).toHaveAttribute('data-active', 'true');
@@ -235,7 +235,7 @@ describe('ExtractionView', () => {
 
   it('hovering group highlights all member entities and facts', async () => {
     const user = userEvent.setup();
-    render(<ExtractionView extractionV2={extraction} sourceText={sourceText} debug={debug} />);
+    render(<ExtractionView extraction={extraction} sourceText={sourceText} debug={debug} />);
 
     await user.hover(screen.getByTestId('group-row-people'));
 

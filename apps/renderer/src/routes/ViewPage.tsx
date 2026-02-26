@@ -87,7 +87,7 @@ export const ViewPage = ({ id }: { id: string }) => {
         />
       ) : (
         <ExtractionView
-          extractionV2={entry.extractionV2}
+          extraction={entry.extraction}
           sourceText={entry.sourceText}
           debug={entry.debug}
         />

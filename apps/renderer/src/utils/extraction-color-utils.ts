@@ -1,4 +1,4 @@
-import type { ExtractionV2 } from '@repo/api';
+import type { Extraction } from '@repo/api';
 import type { EntitySwatch } from '../types/extraction-ui.js';
 
 export const ENTITY_SWATCHES: EntitySwatch[] = [
@@ -18,7 +18,7 @@ export const DEFAULT_SWATCH: EntitySwatch = {
 };
 
 export const buildEntitySwatchMap = (
-  entities: ExtractionV2['entities'],
+  entities: Extraction['entities'],
 ): Map<string, EntitySwatch> => {
   const swatchMap = new Map<string, EntitySwatch>();
   for (const [index, entity] of entities.entries()) {

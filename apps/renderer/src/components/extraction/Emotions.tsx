@@ -1,11 +1,11 @@
-import type { ExtractionV2 } from '@repo/api';
+import type { Extraction } from '@repo/api';
 import { cardStyle, emotionIntensityWidth, sectionHeader } from '../../styles/extraction-theme.js';
 
 export const ExtractionEmotions = ({
-  extractionV2,
+  extraction,
   compact = false,
 }: {
-  extractionV2: ExtractionV2;
+  extraction: Extraction;
   compact?: boolean;
 }) => {
   return (
@@ -21,10 +21,10 @@ export const ExtractionEmotions = ({
           gap: compact ? 4 : 6,
         }}
       >
-        {extractionV2.emotions.length === 0 ? (
+        {extraction.emotions.length === 0 ? (
           <li>-</li>
         ) : (
-          extractionV2.emotions.map((emotion, index) => (
+          extraction.emotions.map((emotion, index) => (
             <li
               key={`${emotion.emotion}-${index}`}
               style={{

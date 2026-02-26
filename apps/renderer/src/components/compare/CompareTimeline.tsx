@@ -63,7 +63,7 @@ const CompareColumn = ({
       ? splitLaneErrorMessage(lane.errorMessage)
       : undefined;
 
-  const canExpand = lane.status === 'ok' && lane.extractionV2 && lane.debug;
+  const canExpand = lane.status === 'ok' && lane.extraction && lane.debug;
 
   return (
     <article
@@ -209,29 +209,29 @@ const CompareColumn = ({
         </div>
       ) : null}
 
-      {lane.status === 'ok' && lane.extractionV2 && lane.debug && !expanded ? (
+      {lane.status === 'ok' && lane.extraction && lane.debug && !expanded ? (
         <div style={{ padding: '10px 14px', fontSize: 13, display: 'grid', gap: 4 }}>
           <div>
-            <strong>Title:</strong> {lane.extractionV2?.title}
+            <strong>Title:</strong> {lane.extraction?.title}
           </div>
           <div>
-            <strong>Sentiment:</strong> {lane.extractionV2?.sentiment}
+            <strong>Sentiment:</strong> {lane.extraction?.sentiment}
           </div>
           <div>
-            <strong>Entities:</strong> {lane.extractionV2?.entities.length ?? 0} |{' '}
-            <strong>Facts:</strong> {lane.extractionV2?.facts.length ?? 0} |{' '}
-            <strong>Relations:</strong> {lane.extractionV2?.relations.length ?? 0}
+            <strong>Entities:</strong> {lane.extraction?.entities.length ?? 0} |{' '}
+            <strong>Facts:</strong> {lane.extraction?.facts.length ?? 0} |{' '}
+            <strong>Relations:</strong> {lane.extraction?.relations.length ?? 0}
           </div>
           <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-            <strong>Summary:</strong> {lane.extractionV2?.summary}
+            <strong>Summary:</strong> {lane.extraction?.summary}
           </div>
         </div>
       ) : null}
 
-      {lane.status === 'ok' && lane.extractionV2 && lane.debug && expanded ? (
+      {lane.status === 'ok' && lane.extraction && lane.debug && expanded ? (
         <div data-testid={`compare-lane-success-${lane.laneId}`} style={{ padding: 14 }}>
           <ExtractionView
-            extractionV2={lane.extractionV2}
+            extraction={lane.extraction}
             sourceText={sourceText}
             debug={lane.debug}
             showDebugActions={false}

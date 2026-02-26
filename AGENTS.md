@@ -56,10 +56,10 @@
 
 ## Current Execution Plan
 1. Stabilize global-context extraction pipeline in `@repo/auto-extract` with strict grounding and deterministic post-processing.
-2. Keep extraction API additive and graph-ready around V2-only payloads (`extractionV2`, `debug`) with no V1 compatibility surface.
+2. Keep extraction API additive and graph-ready around V2-only payloads (`extraction`, `debug`) with no V1 compatibility surface.
 3. Improve renderer extraction UX: highlighted source text, entity excerpts, fact ownership/perspective clarity, and debug-copy workflow.
 4. Maintain deterministic verification coverage (backend + RTL + E2E smoke) without brittle model-output assertions in E2E.
-5. Prepare next persistence phase by keeping `extractionV2` graph projection and segment metadata stable for DB storage.
+5. Prepare next persistence phase by keeping `extraction` graph projection and segment metadata stable for DB storage.
 6. Add side-by-side extraction A/B benchmarking lanes (local llama + Claude + OpenAI) with additive API contracts and explicit loading/progress UX.
 7. Persist full A/B compare lane snapshots in extraction history and render them as auto-expanded historical lane rows.
 

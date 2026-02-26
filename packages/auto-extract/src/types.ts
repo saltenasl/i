@@ -2,7 +2,7 @@ export type NoteSentiment = 'positive' | 'negative' | 'neutral' | 'varied';
 export type EntityType = 'person' | 'org' | 'tool' | 'place' | 'concept' | 'event';
 export type FactPerspective = 'self' | 'other' | 'uncertain';
 
-export type ExtractionV2 = {
+export type Extraction = {
   title: string;
   noteType: string;
   summary: string;
@@ -66,8 +66,8 @@ export type ExtractionDebug = {
   inputText: string;
   prompt: string;
   rawModelOutput: string;
-  validatedExtractionV2BeforeSegmentation: ExtractionV2;
-  finalExtractionV2: ExtractionV2;
+  validatedExtractionBeforeSegmentation: Extraction;
+  finalExtraction: Extraction;
   segmentationTrace: Array<{
     segmentId: string;
     start: number;

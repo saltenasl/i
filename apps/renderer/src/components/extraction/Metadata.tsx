@@ -1,14 +1,14 @@
-import type { ExtractionV2 } from '@repo/api';
+import type { Extraction } from '@repo/api';
 import { cardStyle, sectionHeader, sentimentColors } from '../../styles/extraction-theme.js';
 
 export const ExtractionMetadata = ({
-  extractionV2,
+  extraction,
   compact = false,
 }: {
-  extractionV2: ExtractionV2;
+  extraction: Extraction;
   compact?: boolean;
 }) => {
-  const sentColor = sentimentColors[extractionV2.sentiment];
+  const sentColor = sentimentColors[extraction.sentiment];
   const clamp3 = {
     display: '-webkit-box',
     WebkitLineClamp: 3,
@@ -21,11 +21,11 @@ export const ExtractionMetadata = ({
       <div style={{ ...cardStyle, padding: '10px 12px' }}>
         <h3 style={sectionHeader}>Extraction Metadata</h3>
         <div data-testid="extraction-v2-metadata" style={{ display: 'grid', gap: 8 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.2 }}>{extractionV2.title}</div>
+          <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.2 }}>{extraction.title}</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 12 }}>
-            <CompactMetaPill label="type" value={extractionV2.noteType} />
-            <CompactMetaPill label="lang" value={extractionV2.language} />
-            <CompactMetaPill label="date" value={extractionV2.date ?? '-'} />
+            <CompactMetaPill label="type" value={extraction.noteType} />
+            <CompactMetaPill label="lang" value={extraction.language} />
+            <CompactMetaPill label="date" value={extraction.date ?? '-'} />
             <span
               style={{
                 display: 'inline-flex',
@@ -40,14 +40,14 @@ export const ExtractionMetadata = ({
               }}
             >
               sentiment
-              <span>{extractionV2.sentiment}</span>
+              <span>{extraction.sentiment}</span>
             </span>
           </div>
           <div
-            title={extractionV2.summary}
+            title={extraction.summary}
             style={{ fontSize: 12.5, lineHeight: 1.25, opacity: 0.92, ...clamp3 }}
           >
-            {extractionV2.summary}
+            {extraction.summary}
           </div>
         </div>
       </div>
@@ -59,19 +59,19 @@ export const ExtractionMetadata = ({
       <h3 style={sectionHeader}>Extraction Metadata</h3>
       <ul data-testid="extraction-v2-metadata" style={{ margin: 0, paddingLeft: 18 }}>
         <li>
-          <strong>title</strong>: {extractionV2.title}
+          <strong>title</strong>: {extraction.title}
         </li>
         <li>
-          <strong>noteType</strong>: {extractionV2.noteType}
+          <strong>noteType</strong>: {extraction.noteType}
         </li>
         <li>
-          <strong>summary</strong>: {extractionV2.summary}
+          <strong>summary</strong>: {extraction.summary}
         </li>
         <li>
-          <strong>language</strong>: {extractionV2.language}
+          <strong>language</strong>: {extraction.language}
         </li>
         <li>
-          <strong>date</strong>: {extractionV2.date ?? '-'}
+          <strong>date</strong>: {extraction.date ?? '-'}
         </li>
         <li>
           <strong>sentiment</strong>:{' '}
@@ -87,7 +87,7 @@ export const ExtractionMetadata = ({
               border: `1px solid ${sentColor.border}`,
             }}
           >
-            {extractionV2.sentiment}
+            {extraction.sentiment}
           </span>
         </li>
       </ul>

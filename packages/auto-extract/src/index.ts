@@ -6,7 +6,7 @@ import { openai } from '@ai-sdk/openai';
 import { generateObject, generateText, jsonSchema } from 'ai';
 import { ensureAssets } from './assets.js';
 import { buildPromptV2, buildSystemPromptV2, buildUserPromptV2 } from './prompt.js';
-import type { ExtractionDebug, ExtractionV2, FactPerspective, NoteSentiment } from './types.js';
+import type { Extraction, ExtractionDebug, FactPerspective, NoteSentiment } from './types.js';
 import { parseAndValidateExtractionV2Output, validateExtractionV2 } from './validate.js';
 
 const FAST_OUTPUT_TOKENS = 400;
@@ -162,16 +162,16 @@ const extractionV2JsonSchema = {
   },
 } as const;
 
-const hasRequiredFacts = (extraction: ExtractionV2): boolean => {
+const hasRequiredFacts = (extraction: Extraction): boolean => {
   return extraction.facts.length > 0;
 };
 
-const buildHeuristicFallbackExtraction = (text: string): ExtractionV2 => {
+const buildHeuristicFallbackExtraction = (text: string): Extraction => {
   const iMatch = /\bI\b/i.exec(text);
   const selfStart = iMatch?.index ?? 0;
   const selfEnd = selfStart + 1;
 
-  const entities: ExtractionV2['entities'] = [
+  const entities: Extraction['entities'] = [
     {
       id: 'ent_self',
       name: text.slice(selfStart, selfEnd) || 'I',
@@ -219,13 +219,13 @@ const buildHeuristicFallbackExtraction = (text: string): ExtractionV2 => {
     });
   }
 
-  const facts: ExtractionV2['facts'] = [];
+  const facts: Extraction['facts'] = [];
   const addFact = (
     regex: RegExp,
     predicate: string,
     ownerEntityId: string,
     perspective: FactPerspective,
-    extra?: Partial<ExtractionV2['facts'][number]>,
+    extra?: Partial<Extraction['facts'][number]>,
   ) => {
     const match = regex.exec(text);
     if (match?.index === undefined) {
@@ -308,7 +308,7 @@ export type ExtractionLaneResult = {
   model: string;
   status: 'ok' | 'error' | 'skipped';
   durationMs: number;
-  extractionV2?: ExtractionV2;
+  extraction?: Extraction;
   debug?: ExtractionDebug;
   errorMessage?: string;
 };
@@ -323,7 +323,7 @@ type LlamaServerRuntime = {
 };
 
 type ExtractionBundle = {
-  extractionV2: ExtractionV2;
+  extraction: Extraction;
   debug: ExtractionDebug;
 };
 
@@ -658,21 +658,21 @@ const finalizeExtractionBundle = (
   text: string,
   prompt: string,
   rawModelOutput: string,
-  validated: ExtractionV2,
+  validated: Extraction,
   startedAt: number,
   runtime: ExtractionDebug['runtime'],
   fallbackUsed: boolean,
   errors: string[],
 ): ExtractionBundle => {
   const segmented = deriveSegments(validated, text);
-  const extractionV2 = segmented.extraction;
+  const extraction = segmented.extraction;
 
   const debug: ExtractionDebug = {
     inputText: text,
     prompt,
     rawModelOutput,
-    validatedExtractionV2BeforeSegmentation: validated,
-    finalExtractionV2: extractionV2,
+    validatedExtractionBeforeSegmentation: validated,
+    finalExtraction: extraction,
     segmentationTrace: segmented.trace,
     runtime: {
       ...runtime,
@@ -682,7 +682,7 @@ const finalizeExtractionBundle = (
     errors,
   };
 
-  return { extractionV2, debug };
+  return { extraction, debug };
 };
 
 const spanFromRegexMatch = (match: RegExpExecArray | null): Span | null => {
@@ -709,7 +709,7 @@ const isNarratorPronoun = (value: string): boolean => {
   return /^(?:i|me|my|mine|we|our|us)$/i.test(value.trim());
 };
 
-const isNarratorEntity = (entity: ExtractionV2['entities'][number]): boolean => {
+const isNarratorEntity = (entity: Extraction['entities'][number]): boolean => {
   if (entity.id === NARRATOR_ENTITY_ID) {
     return true;
   }
@@ -737,7 +737,7 @@ const replaceNarratorWord = (value: string): string => {
   return value.replace(/\bnarrator\b/gi, NOTETAKER_TERM);
 };
 
-const ensureNotetakerTerminology = (extraction: ExtractionV2): ExtractionV2 => {
+const ensureNotetakerTerminology = (extraction: Extraction): Extraction => {
   return {
     ...extraction,
     summary: replaceNarratorWord(extraction.summary),
@@ -756,7 +756,7 @@ const ensureNotetakerTerminology = (extraction: ExtractionV2): ExtractionV2 => {
   };
 };
 
-const nextFactId = (facts: ExtractionV2['facts']): string => {
+const nextFactId = (facts: Extraction['facts']): string => {
   const seen = new Set(facts.map((fact) => fact.id));
   let value = facts.length + 1;
   while (seen.has(`fact_${value}`)) {
@@ -765,7 +765,7 @@ const nextFactId = (facts: ExtractionV2['facts']): string => {
   return `fact_${value}`;
 };
 
-const deriveFactSentiment = (fact: ExtractionV2['facts'][number], text: string): NoteSentiment => {
+const deriveFactSentiment = (fact: Extraction['facts'][number], text: string): NoteSentiment => {
   const evidence = text.slice(fact.evidenceStart, fact.evidenceEnd).toLowerCase();
   const predicate = fact.predicate.toLowerCase();
   const object = (fact.objectText ?? '').toLowerCase();
@@ -787,10 +787,10 @@ const deriveFactSentiment = (fact: ExtractionV2['facts'][number], text: string):
 };
 
 const deriveSegments = (
-  extraction: ExtractionV2,
+  extraction: Extraction,
   text: string,
 ): {
-  extraction: ExtractionV2;
+  extraction: Extraction;
   trace: ExtractionDebug['segmentationTrace'];
 } => {
   const factSentiments = extraction.facts.map((fact) => deriveFactSentiment(fact, text));
@@ -811,7 +811,7 @@ const deriveSegments = (
   };
 };
 
-const ensureSelfOwnership = (extraction: ExtractionV2, text: string): ExtractionV2 => {
+const ensureSelfOwnership = (extraction: Extraction, text: string): Extraction => {
   const seenEntityIds = new Set<string>();
   const dedupedEntities = extraction.entities.filter((entity) => {
     if (seenEntityIds.has(entity.id)) {
@@ -967,9 +967,9 @@ const isDrivingPredicate = (predicate: string): boolean => {
 };
 
 const removeConflictingCollectiveDrivingFacts = (
-  extraction: ExtractionV2,
+  extraction: Extraction,
   text: string,
-): ExtractionV2 => {
+): Extraction => {
   const hasExplicitOtherDriver = extraction.facts.some(
     (fact) => fact.ownerEntityId !== NARRATOR_ENTITY_ID && isDrivingPredicate(fact.predicate),
   );
@@ -1016,14 +1016,14 @@ const removeConflictingCollectiveDrivingFacts = (
   };
 };
 
-export const postProcessExtractionV2 = (extraction: ExtractionV2, text: string): ExtractionV2 => {
+export const postProcessExtractionV2 = (extraction: Extraction, text: string): Extraction => {
   const owned = ensureSelfOwnership(extraction, text);
   const withTodos = enrichTodoFacts(owned, text);
   const conflictCleaned = removeConflictingCollectiveDrivingFacts(withTodos, text);
   return ensureNotetakerTerminology(conflictCleaned);
 };
 
-const enrichTodoFacts = (extraction: ExtractionV2, text: string): ExtractionV2 => {
+const enrichTodoFacts = (extraction: Extraction, text: string): Extraction => {
   const selfEntity = extraction.entities.find((entity) => isNarratorEntity(entity));
   if (!selfEntity) {
     return extraction;
@@ -1111,7 +1111,7 @@ const runCloudExtractionBundle = async (
   const system = buildSystemPromptV2();
   const errors: string[] = [];
   let rawModelOutput = '';
-  let validated: ExtractionV2 | null = null;
+  let validated: Extraction | null = null;
   let fallbackUsed = false;
 
   const model =
@@ -1130,7 +1130,7 @@ const runCloudExtractionBundle = async (
       prompt,
       maxOutputTokens: CLOUD_OUTPUT_TOKENS,
       timeout: CLOUD_REQUEST_TIMEOUT_MS,
-      schemaName: 'extraction_v2',
+      schemaName: 'extraction',
       schemaDescription: 'Grounded extraction output for a personal note.',
       schema: jsonSchema(extractionV2JsonSchema),
       ...(providerOptions ? { providerOptions } : {}),
@@ -1199,7 +1199,7 @@ const runCloudExtractionBundle = async (
 };
 
 export async function extractWithDebug(text: string): Promise<{
-  extractionV2: ExtractionV2;
+  extraction: Extraction;
   debug: ExtractionDebug;
 }> {
   if (typeof text !== 'string' || text.length === 0) {
@@ -1212,7 +1212,7 @@ export async function extractWithDebug(text: string): Promise<{
   let rawModelOutput = '';
 
   const runtime = await getRuntime();
-  let validated: ExtractionV2 | null = null;
+  let validated: Extraction | null = null;
   let fallbackUsed = false;
   let nPredict = FAST_OUTPUT_TOKENS;
 
@@ -1321,7 +1321,7 @@ export async function extractCompareLane(
       model: lane.model,
       status: 'ok',
       durationMs: Date.now() - startedAt,
-      extractionV2: bundle.extractionV2,
+      extraction: bundle.extraction,
       debug: bundle.debug,
     };
   } catch (error) {
@@ -1346,9 +1346,9 @@ export async function extractCompare(text: string): Promise<{ lanes: ExtractionL
   return { lanes };
 }
 
-export async function extractV2(text: string): Promise<ExtractionV2> {
+export async function extractV2(text: string): Promise<Extraction> {
   const result = await extractWithDebug(text);
-  return result.extractionV2;
+  return result.extraction;
 }
 
-export type { ExtractionDebug, ExtractionV2 } from './types.js';
+export type { ExtractionDebug, Extraction } from './types.js';

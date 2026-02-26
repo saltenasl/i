@@ -1,4 +1,4 @@
-import type { ExtractionV2 } from '@repo/api';
+import type { Extraction } from '@repo/api';
 import {
   cardStyle,
   itemRow,
@@ -16,9 +16,9 @@ export const ExtractionSegments = ({
   setHoverTarget,
   compact = false,
 }: {
-  segments: ExtractionV2['segments'];
+  segments: Extraction['segments'];
   sourceTextLength: number;
-  entityById: Map<string, ExtractionV2['entities'][number]>;
+  entityById: Map<string, Extraction['entities'][number]>;
   entitySwatchById: Map<string, EntitySwatch>;
   active: ActiveHighlights;
   setHoverTarget: (target: HoverTarget) => void;

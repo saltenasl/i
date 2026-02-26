@@ -1,4 +1,4 @@
-import type { ExtractionV2 } from '@repo/api';
+import type { Extraction } from '@repo/api';
 import {
   cardStyle,
   entityTypeBadges,
@@ -24,7 +24,7 @@ export const ExtractionEntities = ({
   setHoverTarget,
   compact = false,
 }: {
-  entities: ExtractionV2['entities'];
+  entities: Extraction['entities'];
   sourceText: string;
   entitySwatchById: Map<string, EntitySwatch>;
   active: ActiveHighlights;

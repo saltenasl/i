@@ -100,7 +100,7 @@ describe('createBackendHandlers', () => {
     const handlers = createBackendHandlers({
       db: harness.db,
       runExtractionBundle: async (text) => ({
-        extractionV2: {
+        extraction: {
           title: 'Extracted',
           noteType: 'reference',
           summary: 'Uses local llama runtime.',
@@ -149,7 +149,7 @@ describe('createBackendHandlers', () => {
           inputText: text,
           prompt: 'prompt',
           rawModelOutput: '{}',
-          validatedExtractionV2BeforeSegmentation: {
+          validatedExtractionBeforeSegmentation: {
             title: 'Extracted',
             noteType: 'reference',
             summary: 'Uses local llama runtime.',
@@ -163,7 +163,7 @@ describe('createBackendHandlers', () => {
             groups: [],
             segments: [],
           },
-          finalExtractionV2: {
+          finalExtraction: {
             title: 'Extracted',
             noteType: 'reference',
             summary: 'Uses local llama runtime.',
@@ -196,7 +196,7 @@ describe('createBackendHandlers', () => {
       return;
     }
 
-    expect(result.data.extractionV2.entities[0]?.name).toBe('llama.cpp');
+    expect(result.data.extraction.entities[0]?.name).toBe('llama.cpp');
     expect(result.data.debug.runtime.serverMode).toBe('cpu');
 
     const historyResult = await handlers['extract.history.list']({ limit: 10 });
@@ -218,7 +218,7 @@ describe('createBackendHandlers', () => {
     const handlers = createBackendHandlers({
       db: harness.db,
       runExtractionBundle: async (text) => ({
-        extractionV2: {
+        extraction: {
           title: text.slice(0, 12),
           noteType: 'personal',
           summary: text,
@@ -236,7 +236,7 @@ describe('createBackendHandlers', () => {
           inputText: text,
           prompt: `prompt:${text}`,
           rawModelOutput: '{}',
-          validatedExtractionV2BeforeSegmentation: {
+          validatedExtractionBeforeSegmentation: {
             title: text.slice(0, 12),
             noteType: 'personal',
             summary: text,
@@ -250,7 +250,7 @@ describe('createBackendHandlers', () => {
             groups: [],
             segments: [],
           },
-          finalExtractionV2: {
+          finalExtraction: {
             title: text.slice(0, 12),
             noteType: 'personal',
             summary: text,
@@ -314,7 +314,7 @@ describe('createBackendHandlers', () => {
         model: laneId,
         status: 'ok',
         durationMs: 5,
-        extractionV2: {
+        extraction: {
           title: 'Lane',
           noteType: 'personal',
           summary: 'Summary',
@@ -332,7 +332,7 @@ describe('createBackendHandlers', () => {
           inputText: text,
           prompt: 'prompt',
           rawModelOutput: '{}',
-          validatedExtractionV2BeforeSegmentation: {
+          validatedExtractionBeforeSegmentation: {
             title: 'Lane',
             noteType: 'personal',
             summary: 'Summary',
@@ -346,7 +346,7 @@ describe('createBackendHandlers', () => {
             groups: [],
             segments: [],
           },
-          finalExtractionV2: {
+          finalExtraction: {
             title: 'Lane',
             noteType: 'personal',
             summary: 'Summary',
@@ -409,7 +409,7 @@ describe('createBackendHandlers', () => {
             model: 'local-llama.cpp',
             status: 'ok',
             durationMs: 10,
-            extractionV2: {
+            extraction: {
               title: 'Local',
               noteType: 'personal',
               summary: 'Local summary',
@@ -427,7 +427,7 @@ describe('createBackendHandlers', () => {
               inputText: text,
               prompt: 'compare prompt',
               rawModelOutput: '{}',
-              validatedExtractionV2BeforeSegmentation: {
+              validatedExtractionBeforeSegmentation: {
                 title: 'Local',
                 noteType: 'personal',
                 summary: 'Local summary',
@@ -441,7 +441,7 @@ describe('createBackendHandlers', () => {
                 groups: [],
                 segments: [],
               },
-              finalExtractionV2: {
+              finalExtraction: {
                 title: 'Local',
                 noteType: 'personal',
                 summary: 'Local summary',

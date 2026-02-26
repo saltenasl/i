@@ -1,4 +1,4 @@
-import type { EntityType, ExtractionV2, FactPerspective, NoteSentiment } from './types.js';
+import type { EntityType, Extraction, FactPerspective, NoteSentiment } from './types.js';
 
 const TAXONOMY = [
   'people',
@@ -448,7 +448,7 @@ const predicateToGroup = (predicate: string): TaxonomyName => {
   return 'actions';
 };
 
-export const normalizeGroupsV2 = (extraction: ExtractionV2): ExtractionV2['groups'] => {
+export const normalizeGroupsV2 = (extraction: Extraction): Extraction['groups'] => {
   const map = new Map<TaxonomyName, { entityIds: Set<string>; factIds: Set<string> }>();
 
   const ensureGroup = (name: TaxonomyName) => {
@@ -523,10 +523,10 @@ const normalizeSentiment = (value: string): NoteSentiment => {
   return value as NoteSentiment;
 };
 
-export const validateExtractionV2 = (text: string, rawInput: unknown): ExtractionV2 => {
+export const validateExtractionV2 = (text: string, rawInput: unknown): Extraction => {
   const raw = normalizeExtractionInput(rawInput);
   if (!isObject(raw)) {
-    throw new Error('ExtractionV2 must be an object.');
+    throw new Error('Extraction must be an object.');
   }
 
   const title = parseString(raw.title, 'title');
@@ -886,7 +886,7 @@ export const validateExtractionV2 = (text: string, rawInput: unknown): Extractio
       })
     : [];
 
-  const extraction: ExtractionV2 = {
+  const extraction: Extraction = {
     title,
     noteType,
     summary,
@@ -907,9 +907,6 @@ export const validateExtractionV2 = (text: string, rawInput: unknown): Extractio
   };
 };
 
-export const parseAndValidateExtractionV2Output = (
-  text: string,
-  rawOutput: string,
-): ExtractionV2 => {
+export const parseAndValidateExtractionV2Output = (text: string, rawOutput: string): Extraction => {
   return validateExtractionV2(text, parseJsonObjectFromOutput(rawOutput));
 };

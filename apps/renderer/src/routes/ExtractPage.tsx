@@ -1,4 +1,4 @@
-import type { ExtractionDebug, ExtractionHistoryEntryDto, ExtractionV2 } from '@repo/api';
+import type { Extraction, ExtractionDebug, ExtractionHistoryEntryDto } from '@repo/api';
 import { type FormEvent, type KeyboardEvent, useCallback, useEffect, useState } from 'react';
 import { useApi } from '../api-context.js';
 import {
@@ -27,7 +27,7 @@ export const ExtractPage = () => {
   const [selectedHistoryIds, setSelectedHistoryIds] = useState<Set<string>>(new Set());
   const [copySelectedState, setCopySelectedState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [result, setResult] = useState<{
-    extractionV2: ExtractionV2;
+    extraction: Extraction;
     debug: ExtractionDebug;
   } | null>(null);
   const loadHistory = useCallback(async () => {
@@ -61,7 +61,7 @@ export const ExtractPage = () => {
 
     setError(null);
     setResult({
-      extractionV2: response.data.extractionV2,
+      extraction: response.data.extraction,
       debug: response.data.debug,
     });
     await loadHistory();
@@ -133,7 +133,7 @@ export const ExtractPage = () => {
               createdAt: entry.createdAt,
               sourceText: entry.sourceText,
               prompt: entry.prompt,
-              extractionV2: entry.extractionV2,
+              extraction: entry.extraction,
               debug: entry.debug,
               compareLanes: entry.compareLanes,
             })),
@@ -151,7 +151,7 @@ export const ExtractPage = () => {
   const openHistoryEntry = (entry: ExtractionHistoryEntryDto) => {
     setText(entry.sourceText);
     setResult({
-      extractionV2: entry.extractionV2,
+      extraction: entry.extraction,
       debug: entry.debug,
     });
     setCompareLanes((entry.compareLanes ?? []).map(toLaneUi));
@@ -210,11 +210,7 @@ export const ExtractPage = () => {
 
       {result ? (
         <>
-          <ExtractionView
-            extractionV2={result.extractionV2}
-            sourceText={text}
-            debug={result.debug}
-          />
+          <ExtractionView extraction={result.extraction} sourceText={text} debug={result.debug} />
 
           <details style={{ marginTop: 10 }}>
             <summary>Raw JSON</summary>

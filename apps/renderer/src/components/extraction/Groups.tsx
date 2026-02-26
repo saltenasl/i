@@ -1,4 +1,4 @@
-import type { ExtractionV2 } from '@repo/api';
+import type { Extraction } from '@repo/api';
 import { cardStyle, itemRow, sectionHeader } from '../../styles/extraction-theme.js';
 import type { ActiveHighlights, EntitySwatch, HoverTarget } from '../../types/extraction-ui.js';
 
@@ -17,8 +17,8 @@ export const ExtractionGroups = ({
   setHoverTarget,
   compact = false,
 }: {
-  groups: ExtractionV2['groups'];
-  entityById: Map<string, ExtractionV2['entities'][number]>;
+  groups: Extraction['groups'];
+  entityById: Map<string, Extraction['entities'][number]>;
   entitySwatchById: Map<string, EntitySwatch>;
   active: ActiveHighlights;
   setHoverTarget: (target: HoverTarget) => void;

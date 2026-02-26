@@ -1,11 +1,11 @@
-import type { ExtractionV2 } from '@repo/api';
+import type { Extraction } from '@repo/api';
 import type { EnhancedSourceToken, SourceSpan } from '../types/extraction-ui.js';
 
 export const buildEnhancedSourceTokens = (
   sourceText: string,
-  entities: ExtractionV2['entities'],
-  facts: ExtractionV2['facts'],
-  relations: ExtractionV2['relations'],
+  entities: Extraction['entities'],
+  facts: Extraction['facts'],
+  relations: Extraction['relations'],
 ): EnhancedSourceToken[] => {
   if (sourceText.length === 0) {
     return [];

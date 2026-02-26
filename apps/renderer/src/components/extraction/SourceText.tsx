@@ -1,4 +1,4 @@
-import type { ExtractionV2 } from '@repo/api';
+import type { Extraction } from '@repo/api';
 import { useMemo } from 'react';
 import { cardStyle, sectionHeader, sourceTextContainer } from '../../styles/extraction-theme.js';
 import type { ActiveHighlights, EntitySwatch, HoverTarget } from '../../types/extraction-ui.js';
@@ -16,9 +16,9 @@ export const ExtractionSourceText = ({
   compact = false,
 }: {
   sourceText: string;
-  entities: ExtractionV2['entities'];
-  facts: ExtractionV2['facts'];
-  relations: ExtractionV2['relations'];
+  entities: Extraction['entities'];
+  facts: Extraction['facts'];
+  relations: Extraction['relations'];
   entitySwatchById: Map<string, EntitySwatch>;
   active: ActiveHighlights;
   setHoverTarget: (target: HoverTarget) => void;
@@ -136,8 +136,8 @@ const getEvidenceLineStyle = (type: string): string => {
 const getEvidenceUnderline = (
   evidenceSpans: Array<{ type: string; id: string }>,
   entitySwatchById: Map<string, EntitySwatch>,
-  factById: Map<string, ExtractionV2['facts'][number]>,
-  relations: ExtractionV2['relations'],
+  factById: Map<string, Extraction['facts'][number]>,
+  relations: Extraction['relations'],
   active: ActiveHighlights,
 ): string | undefined => {
   if (evidenceSpans.length === 0) {
@@ -171,8 +171,8 @@ const isEvidenceSpanActive = (
 const getEvidenceSpanSwatch = (
   span: { type: string; id: string },
   entitySwatchById: Map<string, EntitySwatch>,
-  factById: Map<string, ExtractionV2['facts'][number]>,
-  relations: ExtractionV2['relations'],
+  factById: Map<string, Extraction['facts'][number]>,
+  relations: Extraction['relations'],
 ): EntitySwatch => {
   if (span.type === 'entity-evidence') {
     return getEntitySwatch(span.id, entitySwatchById);

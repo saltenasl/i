@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { postProcessExtractionV2 } from './index.js';
-import type { ExtractionV2 } from './types.js';
+import type { Extraction } from './types.js';
 import { normalizeGroupsV2, validateExtractionV2 } from './validate.js';
 
 const V2_TEXT =
   'I called road maintenance. Egle was driving in Klaipeda and she was scared. Maybe when I was a kid the seaside had white dunes.';
 
-const createValidExtractionV2 = (): ExtractionV2 => {
+const createValidExtractionV2 = (): Extraction => {
   const iStart = V2_TEXT.indexOf('I');
   const egleStart = V2_TEXT.indexOf('Egle');
   const drivingStart = V2_TEXT.indexOf('Egle was driving');
@@ -202,7 +202,7 @@ describe('postProcessExtractionV2', () => {
       throw new Error('Expected notetaker/driver fixtures to exist in source text.');
     }
 
-    const raw: ExtractionV2 = {
+    const raw: Extraction = {
       title: 'Drive note',
       noteType: 'personal',
       summary: 'We drove and I called support while Egle drove.',
@@ -287,7 +287,7 @@ describe('postProcessExtractionV2', () => {
       throw new Error('Expected notetaker fixture to exist in source text.');
     }
 
-    const raw: ExtractionV2 = {
+    const raw: Extraction = {
       title: 'Note',
       noteType: 'personal',
       summary: 'Narrator noted this.',

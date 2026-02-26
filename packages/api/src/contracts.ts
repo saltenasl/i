@@ -19,7 +19,7 @@ export interface ExtractionHistoryEntryDto {
   id: string;
   sourceText: string;
   prompt: string;
-  extractionV2: ExtractionV2;
+  extraction: Extraction;
   debug: ExtractionDebug;
   compareLanes?: ExtractionLaneResult[];
   createdAt: string;
@@ -29,7 +29,7 @@ export type NoteSentiment = 'positive' | 'negative' | 'neutral' | 'varied';
 export type EntityType = 'person' | 'org' | 'tool' | 'place' | 'concept' | 'event';
 export type FactPerspective = 'self' | 'other' | 'uncertain';
 
-export type ExtractionV2 = {
+export type Extraction = {
   title: string;
   noteType: string;
   summary: string;
@@ -93,8 +93,8 @@ export type ExtractionDebug = {
   inputText: string;
   prompt: string;
   rawModelOutput: string;
-  validatedExtractionV2BeforeSegmentation: ExtractionV2;
-  finalExtractionV2: ExtractionV2;
+  validatedExtractionBeforeSegmentation: Extraction;
+  finalExtraction: Extraction;
   segmentationTrace: Array<{
     segmentId: string;
     start: number;
@@ -119,7 +119,7 @@ export type ExtractionLaneResult = {
   model: string;
   status: 'ok' | 'error' | 'skipped';
   durationMs: number;
-  extractionV2?: ExtractionV2;
+  extraction?: Extraction;
   debug?: ExtractionDebug;
   errorMessage?: string;
 };
@@ -144,7 +144,7 @@ export interface ApiMethodMap {
     input: {
       text: string;
     };
-    output: Result<{ extractionV2: ExtractionV2; debug: ExtractionDebug }, AppErrorCode>;
+    output: Result<{ extraction: Extraction; debug: ExtractionDebug }, AppErrorCode>;
   };
   'extract.history.list': {
     input: {

@@ -1,8 +1,8 @@
 import type {
+  Extraction,
   ExtractionDebug,
   ExtractionLaneId,
   ExtractionLaneResult,
-  ExtractionV2,
 } from '@repo/api';
 import { useState } from 'react';
 import { ExtractionView } from '../extraction/View.js';
@@ -13,7 +13,7 @@ export type CompareLaneUi = {
   model: string;
   status: 'loading' | 'ok' | 'error' | 'skipped';
   durationMs: number | null;
-  extractionV2?: ExtractionV2;
+  extraction?: Extraction;
   debug?: ExtractionDebug;
   errorMessage?: string;
 };
@@ -90,7 +90,7 @@ export const toLaneUi = (lane: ExtractionLaneResult): CompareLaneUi => {
     model: lane.model,
     status: lane.status,
     durationMs: lane.durationMs,
-    ...(lane.extractionV2 ? { extractionV2: lane.extractionV2 } : {}),
+    ...(lane.extraction ? { extraction: lane.extraction } : {}),
     ...(lane.debug ? { debug: lane.debug } : {}),
     ...(lane.errorMessage ? { errorMessage: lane.errorMessage } : {}),
   };
@@ -104,12 +104,12 @@ export const CompareLaneCard = ({
   sourceText: string;
 }) => {
   const laneLabel = compareLaneMeta[lane.laneId];
-  const laneExtraction = lane.status === 'ok' ? lane.extractionV2 : undefined;
+  const laneExtraction = lane.status === 'ok' ? lane.extraction : undefined;
   const laneError =
     lane.status === 'error' || lane.status === 'skipped'
       ? splitLaneErrorMessage(lane.errorMessage)
       : undefined;
-  const canExpand = lane.status === 'ok' && lane.extractionV2 && lane.debug;
+  const canExpand = lane.status === 'ok' && lane.extraction && lane.debug;
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -250,7 +250,7 @@ export const CompareLaneCard = ({
         </div>
       ) : null}
 
-      {lane.status === 'ok' && lane.extractionV2 && lane.debug && !expanded ? (
+      {lane.status === 'ok' && lane.extraction && lane.debug && !expanded ? (
         <div style={{ display: 'grid', gap: 10 }}>
           <div style={{ fontSize: 13, display: 'grid', gap: 4 }}>
             <div>
@@ -271,7 +271,7 @@ export const CompareLaneCard = ({
         </div>
       ) : null}
 
-      {lane.status === 'ok' && lane.extractionV2 && lane.debug && expanded ? (
+      {lane.status === 'ok' && lane.extraction && lane.debug && expanded ? (
         <div
           data-testid={`compare-lane-success-${lane.laneId}`}
           style={{
@@ -284,7 +284,7 @@ export const CompareLaneCard = ({
           }}
         >
           <ExtractionView
-            extractionV2={lane.extractionV2}
+            extraction={lane.extraction}
             sourceText={sourceText}
             debug={lane.debug}
             showDebugActions={false}

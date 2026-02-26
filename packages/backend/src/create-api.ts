@@ -1,10 +1,10 @@
 import {
   type ApiHandlers,
   type ApiInput,
+  type Extraction,
   type ExtractionDebug,
   type ExtractionLaneId,
   type ExtractionLaneResult,
-  type ExtractionV2,
   err,
   ok,
 } from '@repo/api';
@@ -20,7 +20,7 @@ import { createNoteService, listNotesService } from './services/note-service.js'
 export interface BackendDependencies {
   db: DbClient;
   runExtractionBundle?: (text: string) => Promise<{
-    extractionV2: ExtractionV2;
+    extraction: Extraction;
     debug: ExtractionDebug;
   }>;
   runExtractionCompareLane?: (
@@ -61,7 +61,7 @@ export const createBackendHandlers = (deps: BackendDependencies): ApiHandlers =>
       await persistExtractionHistoryService(deps.db, {
         sourceText: text,
         prompt: bundle.debug.prompt,
-        extractionV2: bundle.extractionV2,
+        extraction: bundle.extraction,
         debug: bundle.debug,
       });
       return ok(bundle);
@@ -113,13 +113,13 @@ export const createBackendHandlers = (deps: BackendDependencies): ApiHandlers =>
     try {
       const compare = await (deps.runExtractionCompare ?? extractCompare)(text);
       const representativeLane = compare.lanes.find(
-        (lane) => lane.status === 'ok' && lane.extractionV2 && lane.debug,
+        (lane) => lane.status === 'ok' && lane.extraction && lane.debug,
       );
-      if (representativeLane?.extractionV2 && representativeLane.debug) {
+      if (representativeLane?.extraction && representativeLane.debug) {
         await persistExtractionHistoryService(deps.db, {
           sourceText: text,
           prompt: representativeLane.debug.prompt,
-          extractionV2: representativeLane.extractionV2,
+          extraction: representativeLane.extraction,
           debug: representativeLane.debug,
           compareLanes: compare.lanes,
         });

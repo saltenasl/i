@@ -1,7 +1,7 @@
-import type { ExtractionV2 } from '@repo/api';
+import type { Extraction } from '@repo/api';
 import type { ActiveHighlights, HoverTarget } from '../types/extraction-ui.js';
 
-const factTouchesEntity = (fact: ExtractionV2['facts'][number], entityId: string): boolean => {
+const factTouchesEntity = (fact: Extraction['facts'][number], entityId: string): boolean => {
   return (
     fact.ownerEntityId === entityId ||
     fact.subjectEntityId === entityId ||
@@ -11,7 +11,7 @@ const factTouchesEntity = (fact: ExtractionV2['facts'][number], entityId: string
 
 export const computeActiveHighlights = (
   hoverTarget: HoverTarget,
-  extraction: ExtractionV2,
+  extraction: Extraction,
 ): ActiveHighlights => {
   const entityIds = new Set<string>();
   const factIds = new Set<string>();
@@ -29,7 +29,7 @@ export const computeActiveHighlights = (
     entityIds.add(entityId);
   };
 
-  const addFact = (fact: ExtractionV2['facts'][number] | undefined) => {
+  const addFact = (fact: Extraction['facts'][number] | undefined) => {
     if (!fact) {
       return;
     }
