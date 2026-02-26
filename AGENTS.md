@@ -102,8 +102,8 @@
 - Extraction UI convention: renderer must not display segment cards/lists; segment data may remain in debug payloads/contracts only.
 - History compare convention: extraction history entries originating from A/B compare must preserve the full lane set (including skipped/error lanes) and render auto-expanded lane cards matching the live compare presentation.
 - Compare density convention: A/B compare lanes use compact widget-style extraction cards sized for high information density, favoring dense row previews and hover/active expansion over block-level scrolling.
-- Compare expansion convention: each compare lane expands/minimizes the full lane content in a single lane-level action (no nested "open full extraction" step), and newly generated successful lanes should default to an expanded state for immediate feedback.
-- Compare compact row convention: in compact compare widgets, prefer dense collapsed item rows that expand on hover/active state over block-level scroll containers when presenting entities/facts/relations/groups.
+- Compare expansion convention: each compare lane expands/minimizes the full lane content in a single lane-level action (no nested "open full extraction" step), and both newly generated and historical lanes should default to an expanded state for immediate visibility.
+- Compare compact row convention: in compact compare widgets, prefer stable vertical layout for item rows (entities/facts/relations) to prevent UI jumping during fast cursor movement; avoid auto-expanding excerpts on hover in high-density views.
 - V1 deprecation convention: extraction V1 payloads/types/debug fields are removed from API/runtime/UI; only V2 extraction contracts are supported.
 - Worktree convention: worktrees are optional; direct commits in the primary repository worktree are allowed when preferred to reduce workflow overhead.
 

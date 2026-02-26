@@ -47,7 +47,7 @@ export const ExtractionEntities = ({
         {entities.map((entity) => {
           const swatch = getEntitySwatch(entity.id, entitySwatchById);
           const isActive = active.entityIds.has(entity.id);
-          const showExpanded = !compact || isActive;
+          const showExpanded = !compact;
           const badge = entityTypeBadges[entity.type];
           return (
             <li

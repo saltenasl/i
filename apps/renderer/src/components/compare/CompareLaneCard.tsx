@@ -112,7 +112,7 @@ export const CompareLaneCard = ({
       ? splitLaneErrorMessage(lane.errorMessage)
       : undefined;
   const canExpand = lane.status === 'ok' && lane.extraction && lane.debug;
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
 
   return (
     <article

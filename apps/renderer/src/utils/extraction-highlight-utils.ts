@@ -20,9 +20,9 @@ export const computeActiveHighlights = (
   const groupNames = new Set<string>();
   const segmentIds = new Set<string>();
 
-  const factById = new Map(extraction.facts.map((fact) => [fact.id, fact]));
-  const todoById = new Map((extraction.todos || []).map((todo) => [todo.id, todo]));
-  const groupByName = new Map(extraction.groups.map((group) => [group.name, group]));
+  const factById = new Map((extraction.facts ?? []).map((fact) => [fact.id, fact]));
+  const todoById = new Map((extraction.todos ?? []).map((todo) => [todo.id, todo]));
+  const groupByName = new Map((extraction.groups ?? []).map((group) => [group.name, group]));
 
   const addEntity = (entityId: string | undefined) => {
     if (!entityId) {
@@ -42,7 +42,7 @@ export const computeActiveHighlights = (
   };
 
   const includeGroupsForCurrentSelection = () => {
-    for (const group of extraction.groups) {
+    for (const group of extraction.groups ?? []) {
       const touchesEntity = group.entityIds.some((id) => entityIds.has(id));
       const touchesFact = group.factIds.some((id) => factIds.has(id));
       if (touchesEntity || touchesFact) {
@@ -52,7 +52,7 @@ export const computeActiveHighlights = (
   };
 
   const includeSegmentsForCurrentSelection = () => {
-    for (const segment of extraction.segments) {
+    for (const segment of extraction.segments ?? []) {
       const touchesEntity = segment.entityIds.some((id) => entityIds.has(id));
       const touchesFact = segment.factIds.some((id) => factIds.has(id));
       const touchesRelation = segment.relationIndexes.some((idx) => relationIndexes.has(idx));
@@ -65,12 +65,12 @@ export const computeActiveHighlights = (
   switch (hoverTarget?.kind) {
     case 'entity': {
       addEntity(hoverTarget.entityId);
-      for (const fact of extraction.facts) {
+      for (const fact of extraction.facts ?? []) {
         if (factTouchesEntity(fact, hoverTarget.entityId)) {
           addFact(fact);
         }
       }
-      for (const [relationIndex, relation] of extraction.relations.entries()) {
+      for (const [relationIndex, relation] of (extraction.relations ?? []).entries()) {
         if (
           relation.fromEntityId === hoverTarget.entityId ||
           relation.toEntityId === hoverTarget.entityId
@@ -86,7 +86,7 @@ export const computeActiveHighlights = (
     }
     case 'fact': {
       addFact(factById.get(hoverTarget.factId));
-      for (const [relationIndex, relation] of extraction.relations.entries()) {
+      for (const [relationIndex, relation] of (extraction.relations ?? []).entries()) {
         if (entityIds.has(relation.fromEntityId) || entityIds.has(relation.toEntityId)) {
           relationIndexes.add(relationIndex);
           addEntity(relation.fromEntityId);
@@ -102,12 +102,12 @@ export const computeActiveHighlights = (
       if (todo) {
         todoIds.add(todo.id);
         addEntity(todo.assigneeEntityId);
-        for (const fact of extraction.facts) {
+        for (const fact of extraction.facts ?? []) {
           if (todo.assigneeEntityId && factTouchesEntity(fact, todo.assigneeEntityId)) {
             addFact(fact);
           }
         }
-        for (const [relationIndex, relation] of extraction.relations.entries()) {
+        for (const [relationIndex, relation] of (extraction.relations ?? []).entries()) {
           if (
             todo.assigneeEntityId &&
             (relation.fromEntityId === todo.assigneeEntityId ||
@@ -124,12 +124,12 @@ export const computeActiveHighlights = (
       break;
     }
     case 'relation': {
-      const relation = extraction.relations[hoverTarget.relationIndex];
+      const relation = (extraction.relations ?? [])[hoverTarget.relationIndex];
       if (relation) {
         relationIndexes.add(hoverTarget.relationIndex);
         addEntity(relation.fromEntityId);
         addEntity(relation.toEntityId);
-        for (const fact of extraction.facts) {
+        for (const fact of extraction.facts ?? []) {
           if (
             factTouchesEntity(fact, relation.fromEntityId) ||
             factTouchesEntity(fact, relation.toEntityId)
@@ -152,7 +152,7 @@ export const computeActiveHighlights = (
         for (const factId of group.factIds) {
           addFact(factById.get(factId));
         }
-        for (const [relationIndex, relation] of extraction.relations.entries()) {
+        for (const [relationIndex, relation] of (extraction.relations ?? []).entries()) {
           if (entityIds.has(relation.fromEntityId) || entityIds.has(relation.toEntityId)) {
             relationIndexes.add(relationIndex);
           }
@@ -162,7 +162,7 @@ export const computeActiveHighlights = (
       break;
     }
     case 'segment': {
-      const segment = extraction.segments.find((s) => s.id === hoverTarget.segmentId);
+      const segment = (extraction.segments ?? []).find((s) => s.id === hoverTarget.segmentId);
       if (segment) {
         segmentIds.add(segment.id);
         for (const entityId of segment.entityIds) {
@@ -173,7 +173,7 @@ export const computeActiveHighlights = (
         }
         for (const relationIndex of segment.relationIndexes) {
           relationIndexes.add(relationIndex);
-          const relation = extraction.relations[relationIndex];
+          const relation = (extraction.relations ?? [])[relationIndex];
           if (relation) {
             addEntity(relation.fromEntityId);
             addEntity(relation.toEntityId);

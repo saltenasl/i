@@ -33,12 +33,12 @@ export const ExtractionView = ({
   const compact = layoutMode === 'compact';
 
   const entityById = useMemo(
-    () => new Map(extraction.entities.map((entity) => [entity.id, entity])),
+    () => new Map((extraction.entities ?? []).map((entity) => [entity.id, entity])),
     [extraction.entities],
   );
 
   const entitySwatchById = useMemo(
-    () => buildEntitySwatchMap(extraction.entities),
+    () => buildEntitySwatchMap(extraction.entities ?? []),
     [extraction.entities],
   );
 
@@ -62,10 +62,10 @@ export const ExtractionView = ({
         <div style={{ minWidth: 0, display: 'grid', gap: 12, alignContent: 'start' }}>
           <ExtractionSourceText
             sourceText={sourceText}
-            entities={extraction.entities}
-            facts={extraction.facts}
-            relations={extraction.relations}
-            todos={extraction.todos}
+            entities={extraction.entities ?? []}
+            facts={extraction.facts ?? []}
+            relations={extraction.relations ?? []}
+            todos={extraction.todos ?? []}
             entitySwatchById={entitySwatchById}
             active={active}
             setHoverTarget={setHoverTarget}
@@ -73,7 +73,7 @@ export const ExtractionView = ({
           />
 
           <ExtractionFacts
-            facts={extraction.facts}
+            facts={extraction.facts ?? []}
             sourceText={sourceText}
             entityById={entityById}
             entitySwatchById={entitySwatchById}
@@ -83,7 +83,7 @@ export const ExtractionView = ({
           />
 
           <ExtractionTodos
-            todos={extraction.todos}
+            todos={extraction.todos ?? []}
             sourceText={sourceText}
             entityById={entityById}
             entitySwatchById={entitySwatchById}
@@ -94,7 +94,7 @@ export const ExtractionView = ({
 
           {showSegments ? (
             <ExtractionSegments
-              segments={extraction.segments}
+              segments={extraction.segments ?? []}
               sourceTextLength={sourceText.length}
               entityById={entityById}
               entitySwatchById={entitySwatchById}
@@ -114,7 +114,7 @@ export const ExtractionView = ({
           ) : null}
 
           <ExtractionEntities
-            entities={extraction.entities}
+            entities={extraction.entities ?? []}
             sourceText={sourceText}
             entitySwatchById={entitySwatchById}
             active={active}
@@ -123,7 +123,7 @@ export const ExtractionView = ({
           />
 
           <ExtractionRelations
-            relations={extraction.relations}
+            relations={extraction.relations ?? []}
             entityById={entityById}
             entitySwatchById={entitySwatchById}
             active={active}
@@ -132,7 +132,7 @@ export const ExtractionView = ({
           />
 
           <ExtractionGroups
-            groups={extraction.groups}
+            groups={extraction.groups ?? []}
             entityById={entityById}
             entitySwatchById={entitySwatchById}
             active={active}
@@ -157,17 +157,17 @@ export const ExtractionView = ({
 
       <ExtractionSourceText
         sourceText={sourceText}
-        entities={extraction.entities}
-        facts={extraction.facts}
-        relations={extraction.relations}
-        todos={extraction.todos}
+        entities={extraction.entities ?? []}
+        facts={extraction.facts ?? []}
+        relations={extraction.relations ?? []}
+        todos={extraction.todos ?? []}
         entitySwatchById={entitySwatchById}
         active={active}
         setHoverTarget={setHoverTarget}
       />
 
       <ExtractionEntities
-        entities={extraction.entities}
+        entities={extraction.entities ?? []}
         sourceText={sourceText}
         entitySwatchById={entitySwatchById}
         active={active}
@@ -175,7 +175,7 @@ export const ExtractionView = ({
       />
 
       <ExtractionFacts
-        facts={extraction.facts}
+        facts={extraction.facts ?? []}
         sourceText={sourceText}
         entityById={entityById}
         entitySwatchById={entitySwatchById}
@@ -184,7 +184,7 @@ export const ExtractionView = ({
       />
 
       <ExtractionTodos
-        todos={extraction.todos}
+        todos={extraction.todos ?? []}
         sourceText={sourceText}
         entityById={entityById}
         entitySwatchById={entitySwatchById}
@@ -193,7 +193,7 @@ export const ExtractionView = ({
       />
 
       <ExtractionRelations
-        relations={extraction.relations}
+        relations={extraction.relations ?? []}
         entityById={entityById}
         entitySwatchById={entitySwatchById}
         active={active}
@@ -201,7 +201,7 @@ export const ExtractionView = ({
       />
 
       <ExtractionGroups
-        groups={extraction.groups}
+        groups={extraction.groups ?? []}
         entityById={entityById}
         entitySwatchById={entitySwatchById}
         active={active}
@@ -210,7 +210,7 @@ export const ExtractionView = ({
 
       {showSegments ? (
         <ExtractionSegments
-          segments={extraction.segments}
+          segments={extraction.segments ?? []}
           sourceTextLength={sourceText.length}
           entityById={entityById}
           entitySwatchById={entitySwatchById}

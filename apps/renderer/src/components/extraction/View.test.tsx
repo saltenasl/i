@@ -248,4 +248,25 @@ describe('ExtractionView', () => {
     expect(screen.getByTestId('fact-row-fact_call')).toHaveAttribute('data-active', 'true');
     expect(screen.getByTestId('fact-row-fact_scared')).toHaveAttribute('data-active', 'true');
   });
+
+  it('does not crash when extraction properties are missing', () => {
+    const incompleteExtraction: Extraction = {
+      title: 'Test',
+      noteType: 'test',
+      summary: 'test',
+      language: 'en',
+      date: null,
+      sentiment: 'neutral',
+      emotions: [],
+      entities: [],
+      facts: [],
+      relations: [],
+      todos: [],
+      groups: [],
+      segments: [],
+    };
+
+    render(<ExtractionView extraction={incompleteExtraction} sourceText="test" debug={debug} />);
+    expect(screen.getByTestId('extraction-v2-result')).toBeInTheDocument();
+  });
 });
