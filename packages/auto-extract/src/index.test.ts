@@ -103,6 +103,7 @@ const createValidExtractionV2 = (): Extraction => {
         confidence: 0.82,
       },
     ],
+    todos: [],
     groups: [
       {
         name: 'people',
@@ -259,6 +260,7 @@ describe('postProcessExtractionV2', () => {
         },
       ],
       relations: [],
+      todos: [],
       groups: [
         {
           name: 'people',
@@ -318,6 +320,7 @@ describe('postProcessExtractionV2', () => {
         },
       ],
       relations: [],
+      todos: [],
       groups: [{ name: 'people', entityIds: ['ent_self'], factIds: ['fact_1'] }],
       segments: [],
     };

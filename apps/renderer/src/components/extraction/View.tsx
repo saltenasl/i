@@ -12,6 +12,7 @@ import { ExtractionMetadata } from './Metadata.js';
 import { ExtractionRelations } from './Relations.js';
 import { ExtractionSegments } from './Segments.js';
 import { ExtractionSourceText } from './SourceText.js';
+import { ExtractionTodos } from './Todos.js';
 
 export const ExtractionView = ({
   extraction,
@@ -64,6 +65,7 @@ export const ExtractionView = ({
             entities={extraction.entities}
             facts={extraction.facts}
             relations={extraction.relations}
+            todos={extraction.todos}
             entitySwatchById={entitySwatchById}
             active={active}
             setHoverTarget={setHoverTarget}
@@ -72,6 +74,16 @@ export const ExtractionView = ({
 
           <ExtractionFacts
             facts={extraction.facts}
+            sourceText={sourceText}
+            entityById={entityById}
+            entitySwatchById={entitySwatchById}
+            active={active}
+            setHoverTarget={setHoverTarget}
+            compact
+          />
+
+          <ExtractionTodos
+            todos={extraction.todos}
             sourceText={sourceText}
             entityById={entityById}
             entitySwatchById={entitySwatchById}
@@ -148,6 +160,7 @@ export const ExtractionView = ({
         entities={extraction.entities}
         facts={extraction.facts}
         relations={extraction.relations}
+        todos={extraction.todos}
         entitySwatchById={entitySwatchById}
         active={active}
         setHoverTarget={setHoverTarget}
@@ -163,6 +176,15 @@ export const ExtractionView = ({
 
       <ExtractionFacts
         facts={extraction.facts}
+        sourceText={sourceText}
+        entityById={entityById}
+        entitySwatchById={entitySwatchById}
+        active={active}
+        setHoverTarget={setHoverTarget}
+      />
+
+      <ExtractionTodos
+        todos={extraction.todos}
         sourceText={sourceText}
         entityById={entityById}
         entitySwatchById={entitySwatchById}

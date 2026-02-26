@@ -6,6 +6,7 @@ export type EntitySwatch = {
 export type HoverTarget =
   | { kind: 'entity'; entityId: string }
   | { kind: 'fact'; factId: string }
+  | { kind: 'todo'; todoId: string }
   | { kind: 'relation'; relationIndex: number }
   | { kind: 'group'; groupName: string }
   | { kind: 'segment'; segmentId: string }
@@ -14,6 +15,7 @@ export type HoverTarget =
 export type ActiveHighlights = {
   entityIds: Set<string>;
   factIds: Set<string>;
+  todoIds: Set<string>;
   relationIndexes: Set<number>;
   groupNames: Set<string>;
   segmentIds: Set<string>;
@@ -22,7 +24,7 @@ export type ActiveHighlights = {
 export type SourceSpan = {
   start: number;
   end: number;
-  type: 'entity-name' | 'entity-evidence' | 'fact-evidence' | 'relation-evidence';
+  type: 'entity-name' | 'entity-evidence' | 'fact-evidence' | 'todo-evidence' | 'relation-evidence';
   id: string;
   priority: number;
 };

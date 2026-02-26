@@ -72,6 +72,14 @@ export type Extraction = {
     evidenceEnd?: number;
     confidence: number;
   }>;
+  todos: Array<{
+    id: string;
+    description: string;
+    assigneeEntityId?: string;
+    evidenceStart: number;
+    evidenceEnd: number;
+    confidence: number;
+  }>;
   groups: Array<{
     name: string;
     entityIds: string[];

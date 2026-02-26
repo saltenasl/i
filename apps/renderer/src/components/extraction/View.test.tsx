@@ -80,6 +80,7 @@ const extraction: Extraction = {
       confidence: 0.8,
     },
   ],
+  todos: [],
   groups: [
     {
       name: 'people',
@@ -121,6 +122,7 @@ const debug: ExtractionDebug = {
     entities: [],
     facts: [],
     relations: [],
+    todos: [],
     groups: [],
     segments: [],
   },
@@ -130,6 +132,7 @@ const debug: ExtractionDebug = {
     entities: [],
     facts: [],
     relations: [],
+    todos: [],
     groups: [],
     segments: [],
   },

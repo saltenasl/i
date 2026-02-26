@@ -6,6 +6,7 @@ export const buildEnhancedSourceTokens = (
   entities: Extraction['entities'],
   facts: Extraction['facts'],
   relations: Extraction['relations'],
+  todos: Extraction['todos'] = [],
 ): EnhancedSourceToken[] => {
   if (sourceText.length === 0) {
     return [];
@@ -57,6 +58,22 @@ export const buildEnhancedSourceTokens = (
           type: 'fact-evidence',
           id: fact.id,
           priority: 3,
+        });
+      }
+    }
+  }
+
+  for (const todo of todos) {
+    if (todo.evidenceEnd > todo.evidenceStart) {
+      const start = Math.max(0, Math.min(sourceText.length, todo.evidenceStart));
+      const end = Math.max(0, Math.min(sourceText.length, todo.evidenceEnd));
+      if (end > start) {
+        allSpans.push({
+          start,
+          end,
+          type: 'todo-evidence',
+          id: todo.id,
+          priority: 3.5,
         });
       }
     }

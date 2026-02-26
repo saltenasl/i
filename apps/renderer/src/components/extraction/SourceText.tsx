@@ -10,6 +10,7 @@ export const ExtractionSourceText = ({
   entities,
   facts,
   relations,
+  todos = [],
   entitySwatchById,
   active,
   setHoverTarget,
@@ -19,17 +20,19 @@ export const ExtractionSourceText = ({
   entities: Extraction['entities'];
   facts: Extraction['facts'];
   relations: Extraction['relations'];
+  todos?: Extraction['todos'];
   entitySwatchById: Map<string, EntitySwatch>;
   active: ActiveHighlights;
   setHoverTarget: (target: HoverTarget) => void;
   compact?: boolean;
 }) => {
   const tokens = useMemo(
-    () => buildEnhancedSourceTokens(sourceText, entities, facts, relations),
-    [sourceText, entities, facts, relations],
+    () => buildEnhancedSourceTokens(sourceText, entities, facts, relations, todos),
+    [sourceText, entities, facts, relations, todos],
   );
 
   const factById = useMemo(() => new Map(facts.map((f) => [f.id, f])), [facts]);
+  const todoById = useMemo(() => new Map((todos || []).map((t) => [t.id, t])), [todos]);
 
   return (
     <div style={{ ...cardStyle, padding: compact ? '10px 12px' : '16px 20px' }}>
@@ -77,6 +80,7 @@ export const ExtractionSourceText = ({
                     evidenceSpans,
                     entitySwatchById,
                     factById,
+                    todoById,
                     relations,
                     active,
                   ),
@@ -94,7 +98,13 @@ export const ExtractionSourceText = ({
               return <span key={`plain-${token.start}`}>{token.text}</span>;
             }
             const isActive = isEvidenceSpanActive(topSpan, active);
-            const swatch = getEvidenceSpanSwatch(topSpan, entitySwatchById, factById, relations);
+            const swatch = getEvidenceSpanSwatch(
+              topSpan,
+              entitySwatchById,
+              factById,
+              todoById,
+              relations,
+            );
             return (
               <span
                 key={`evidence-${topSpan.type}-${topSpan.id}-${token.start}`}
@@ -125,6 +135,7 @@ const getEvidenceLineStyle = (type: string): string => {
     case 'entity-evidence':
       return 'dashed';
     case 'fact-evidence':
+    case 'todo-evidence':
       return 'solid';
     case 'relation-evidence':
       return 'dotted';
@@ -137,6 +148,7 @@ const getEvidenceUnderline = (
   evidenceSpans: Array<{ type: string; id: string }>,
   entitySwatchById: Map<string, EntitySwatch>,
   factById: Map<string, Extraction['facts'][number]>,
+  todoById: Map<string, Extraction['todos'][number]>,
   relations: Extraction['relations'],
   active: ActiveHighlights,
 ): string | undefined => {
@@ -148,7 +160,7 @@ const getEvidenceUnderline = (
     return undefined;
   }
   const isActive = isEvidenceSpanActive(topSpan, active);
-  const swatch = getEvidenceSpanSwatch(topSpan, entitySwatchById, factById, relations);
+  const swatch = getEvidenceSpanSwatch(topSpan, entitySwatchById, factById, todoById, relations);
   return `2px ${getEvidenceLineStyle(topSpan.type)} ${isActive ? swatch.accent : 'transparent'}`;
 };
 
@@ -161,6 +173,8 @@ const isEvidenceSpanActive = (
       return active.entityIds.has(span.id);
     case 'fact-evidence':
       return active.factIds.has(span.id);
+    case 'todo-evidence':
+      return active.todoIds.has(span.id);
     case 'relation-evidence':
       return active.relationIndexes.has(Number(span.id));
     default:
@@ -172,6 +186,7 @@ const getEvidenceSpanSwatch = (
   span: { type: string; id: string },
   entitySwatchById: Map<string, EntitySwatch>,
   factById: Map<string, Extraction['facts'][number]>,
+  todoById: Map<string, Extraction['todos'][number]>,
   relations: Extraction['relations'],
 ): EntitySwatch => {
   if (span.type === 'entity-evidence') {
@@ -181,6 +196,12 @@ const getEvidenceSpanSwatch = (
     const fact = factById.get(span.id);
     if (fact) {
       return getEntitySwatch(fact.ownerEntityId, entitySwatchById);
+    }
+  }
+  if (span.type === 'todo-evidence') {
+    const todo = todoById.get(span.id);
+    if (todo?.assigneeEntityId) {
+      return getEntitySwatch(todo.assigneeEntityId, entitySwatchById);
     }
   }
   if (span.type === 'relation-evidence') {
@@ -202,6 +223,9 @@ const setHoverTargetForEvidence = (
       break;
     case 'fact-evidence':
       setHoverTarget({ kind: 'fact', factId: span.id });
+      break;
+    case 'todo-evidence':
+      setHoverTarget({ kind: 'todo', todoId: span.id });
       break;
     case 'relation-evidence':
       setHoverTarget({ kind: 'relation', relationIndex: Number(span.id) });

@@ -155,6 +155,9 @@ const normalizeExtractionInput = (raw: unknown): unknown => {
   normalized.relations = toArray(parsedRaw.relations).map((entry) =>
     normalizeObjectWithNumericKeys(entry, ['evidenceStart', 'evidenceEnd', 'confidence']),
   );
+  normalized.todos = toArray(parsedRaw.todos).map((entry) =>
+    normalizeObjectWithNumericKeys(entry, ['evidenceStart', 'evidenceEnd', 'confidence']),
+  );
   normalized.groups = toArray(parsedRaw.groups).map((entry) => {
     if (!isObject(entry)) {
       return entry;
@@ -776,6 +779,55 @@ export const validateExtractionV2 = (text: string, rawInput: unknown): Extractio
     ];
   });
 
+  const rawTodos = Array.isArray(raw.todos)
+    ? raw.todos.flatMap((todoRaw, index) => {
+        if (!isObject(todoRaw)) {
+          return [];
+        }
+
+        const id = parseString(todoRaw.id, `todos[${index}].id`);
+        const description = parseString(todoRaw.description, `todos[${index}].description`);
+        const evidenceStart = parseNumber(todoRaw.evidenceStart, `todos[${index}].evidenceStart`);
+        const evidenceEnd = parseNumber(todoRaw.evidenceEnd, `todos[${index}].evidenceEnd`);
+        const confidence = parseNumber(todoRaw.confidence, `todos[${index}].confidence`);
+
+        if (
+          !Number.isInteger(evidenceStart) ||
+          !Number.isInteger(evidenceEnd) ||
+          evidenceStart < 0 ||
+          evidenceEnd <= evidenceStart ||
+          evidenceEnd > text.length
+        ) {
+          return [];
+        }
+
+        if (confidence < 0 || confidence > 1) {
+          return [];
+        }
+
+        const assigneeEntityIdRaw = parseOptionalString(
+          todoRaw.assigneeEntityId,
+          `todos[${index}].assigneeEntityId`,
+        );
+
+        const assigneeEntityId =
+          assigneeEntityIdRaw && entityIdSet.has(assigneeEntityIdRaw)
+            ? assigneeEntityIdRaw
+            : undefined;
+
+        return [
+          {
+            id,
+            description,
+            ...(assigneeEntityId ? { assigneeEntityId } : {}),
+            evidenceStart,
+            evidenceEnd,
+            confidence,
+          },
+        ];
+      })
+    : [];
+
   const rawGroups = Array.isArray(raw.groups)
     ? raw.groups.flatMap((groupRaw, index) => {
         if (!isObject(groupRaw)) {
@@ -897,6 +949,7 @@ export const validateExtractionV2 = (text: string, rawInput: unknown): Extractio
     entities,
     facts,
     relations,
+    todos: rawTodos,
     groups: rawGroups,
     segments: rawSegments,
   };

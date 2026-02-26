@@ -15,11 +15,13 @@ export const computeActiveHighlights = (
 ): ActiveHighlights => {
   const entityIds = new Set<string>();
   const factIds = new Set<string>();
+  const todoIds = new Set<string>();
   const relationIndexes = new Set<number>();
   const groupNames = new Set<string>();
   const segmentIds = new Set<string>();
 
   const factById = new Map(extraction.facts.map((fact) => [fact.id, fact]));
+  const todoById = new Map((extraction.todos || []).map((todo) => [todo.id, todo]));
   const groupByName = new Map(extraction.groups.map((group) => [group.name, group]));
 
   const addEntity = (entityId: string | undefined) => {
@@ -95,6 +97,32 @@ export const computeActiveHighlights = (
       includeSegmentsForCurrentSelection();
       break;
     }
+    case 'todo': {
+      const todo = todoById.get(hoverTarget.todoId);
+      if (todo) {
+        todoIds.add(todo.id);
+        addEntity(todo.assigneeEntityId);
+        for (const fact of extraction.facts) {
+          if (todo.assigneeEntityId && factTouchesEntity(fact, todo.assigneeEntityId)) {
+            addFact(fact);
+          }
+        }
+        for (const [relationIndex, relation] of extraction.relations.entries()) {
+          if (
+            todo.assigneeEntityId &&
+            (relation.fromEntityId === todo.assigneeEntityId ||
+              relation.toEntityId === todo.assigneeEntityId)
+          ) {
+            relationIndexes.add(relationIndex);
+            addEntity(relation.fromEntityId);
+            addEntity(relation.toEntityId);
+          }
+        }
+        includeGroupsForCurrentSelection();
+        includeSegmentsForCurrentSelection();
+      }
+      break;
+    }
     case 'relation': {
       const relation = extraction.relations[hoverTarget.relationIndex];
       if (relation) {
@@ -159,5 +187,5 @@ export const computeActiveHighlights = (
       break;
   }
 
-  return { entityIds, factIds, relationIndexes, groupNames, segmentIds };
+  return { entityIds, factIds, todoIds, relationIndexes, groupNames, segmentIds };
 };

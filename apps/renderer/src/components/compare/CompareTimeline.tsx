@@ -234,7 +234,7 @@ const CompareColumn = ({
             extraction={lane.extraction}
             sourceText={sourceText}
             debug={lane.debug}
-            showDebugActions={false}
+            showDebugActions={true}
             showSegments={false}
             layoutMode="compact"
           />

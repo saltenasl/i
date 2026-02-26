@@ -36,6 +36,7 @@ const extractionV2JsonSchema = {
     'entities',
     'facts',
     'relations',
+    'todos',
     'groups',
   ],
   properties: {
@@ -136,6 +137,22 @@ const extractionV2JsonSchema = {
           type: { type: 'string' },
           evidenceStart: { type: ['integer', 'null'] },
           evidenceEnd: { type: ['integer', 'null'] },
+          confidence: { type: 'number' },
+        },
+      },
+    },
+    todos: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['id', 'description', 'evidenceStart', 'evidenceEnd', 'confidence'],
+        properties: {
+          id: { type: 'string' },
+          description: { type: 'string' },
+          assigneeEntityId: { type: ['string', 'null'] },
+          evidenceStart: { type: 'integer' },
+          evidenceEnd: { type: 'integer' },
           confidence: { type: 'number' },
         },
       },
@@ -295,6 +312,7 @@ const buildHeuristicFallbackExtraction = (text: string): Extraction => {
     entities,
     facts,
     relations: [],
+    todos: [],
     groups: [],
     segments: [],
   };
