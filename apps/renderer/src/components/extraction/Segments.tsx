@@ -24,7 +24,7 @@ export const ExtractionSegments = ({
   setHoverTarget: (target: HoverTarget) => void;
   compact?: boolean;
 }) => {
-  if (segments.length === 0) {
+  if (!segments || segments.length === 0) {
     return null;
   }
 
@@ -133,7 +133,7 @@ export const ExtractionSegments = ({
               >
                 <span>
                   entities:{' '}
-                  {segment.entityIds.length === 0
+                  {!segment.entityIds || segment.entityIds.length === 0
                     ? '-'
                     : segment.entityIds.map((id) => {
                         const entity = entityById.get(id);
@@ -166,8 +166,8 @@ export const ExtractionSegments = ({
                         );
                       })}
                 </span>
-                <span>facts: {segment.factIds.length}</span>
-                <span>relations: {segment.relationIndexes.length}</span>
+                <span>facts: {segment.factIds?.length || 0}</span>
+                <span>relations: {segment.relationIndexes?.length || 0}</span>
               </div>
             </li>
           );

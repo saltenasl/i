@@ -45,7 +45,7 @@ export const ExtractionGroups = ({
           gap: compact ? 6 : 8,
         }}
       >
-        {groups.length === 0 ? (
+        {!groups || groups.length === 0 ? (
           <li style={{ opacity: 0.7 }}>-</li>
         ) : (
           groups.map((group) => {
@@ -78,11 +78,11 @@ export const ExtractionGroups = ({
                       }}
                     >
                       <strong>{group.name}</strong>
-                      <span style={{ opacity: 0.75 }}>entities={group.entityIds.length}</span>
-                      <span style={{ opacity: 0.75 }}>facts={group.factIds.length}</span>
+                      <span style={{ opacity: 0.75 }}>entities={group.entityIds?.length || 0}</span>
+                      <span style={{ opacity: 0.75 }}>facts={group.factIds?.length || 0}</span>
                     </div>
                     <div style={{ opacity: 0.8, ...clampLines(1) }}>
-                      {group.entityIds.length === 0
+                      {!group.entityIds || group.entityIds.length === 0
                         ? 'entities: -'
                         : `entities: ${group.entityIds.map((entityId) => getEntityLabel(entityId)).join(', ')}`}
                     </div>
@@ -91,7 +91,7 @@ export const ExtractionGroups = ({
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <strong>{group.name}</strong>
                     {' | entities='}
-                    {group.entityIds.length === 0
+                    {!group.entityIds || group.entityIds.length === 0
                       ? '-'
                       : group.entityIds.map((entityId) => {
                           const swatch = entitySwatchById.get(entityId);
@@ -118,7 +118,7 @@ export const ExtractionGroups = ({
                           );
                         })}
                     {' | facts='}
-                    {group.factIds.length === 0 ? '-' : group.factIds.join(', ')}
+                    {!group.factIds || group.factIds.length === 0 ? '-' : group.factIds.join(', ')}
                   </div>
                 )}
               </li>

@@ -44,94 +44,98 @@ export const ExtractionEntities = ({
           gap: compact ? 6 : 8,
         }}
       >
-        {entities.map((entity) => {
-          const swatch = getEntitySwatch(entity.id, entitySwatchById);
-          const isActive = active.entityIds.has(entity.id);
-          const showExpanded = !compact;
-          const badge = entityTypeBadges[entity.type];
-          return (
-            <li
-              key={entity.id}
-              data-testid={`entity-row-${entity.id}`}
-              data-active={isActive ? 'true' : 'false'}
-              onMouseEnter={() => setHoverTarget({ kind: 'entity', entityId: entity.id })}
-              onMouseLeave={() => setHoverTarget(null)}
-              style={{
-                ...itemRow,
-                padding: compact ? '8px 10px' : itemRow.padding,
-                border: isActive ? `2px solid ${swatch.accent}` : '1px solid #d0d7de',
-                background: isActive ? '#fffaf0' : '#fff',
-                fontSize: compact ? 13 : 14,
-              }}
-            >
-              <div
+        {!entities || entities.length === 0 ? (
+          <li style={{ opacity: 0.7 }}>-</li>
+        ) : (
+          entities.map((entity) => {
+            const swatch = getEntitySwatch(entity.id, entitySwatchById);
+            const isActive = active.entityIds.has(entity.id);
+            const showExpanded = !compact;
+            const badge = entityTypeBadges[entity.type];
+            return (
+              <li
+                key={entity.id}
+                data-testid={`entity-row-${entity.id}`}
+                data-active={isActive ? 'true' : 'false'}
+                onMouseEnter={() => setHoverTarget({ kind: 'entity', entityId: entity.id })}
+                onMouseLeave={() => setHoverTarget(null)}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: compact ? 6 : 8,
-                  flexWrap: 'wrap',
-                  lineHeight: compact ? 1.15 : 1.2,
+                  ...itemRow,
+                  padding: compact ? '8px 10px' : itemRow.padding,
+                  border: isActive ? `2px solid ${swatch.accent}` : '1px solid #d0d7de',
+                  background: isActive ? '#fffaf0' : '#fff',
+                  fontSize: compact ? 13 : 14,
                 }}
               >
-                <span
-                  aria-hidden
-                  style={{
-                    width: 14,
-                    height: 14,
-                    borderRadius: '50%',
-                    background: swatch.fill,
-                    border: `1px solid ${swatch.accent}`,
-                  }}
-                />
-                <strong>{entity.name}</strong>
-                <span
-                  style={{
-                    display: 'inline-block',
-                    padding: '0 6px',
-                    borderRadius: 999,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    background: badge.bg,
-                    color: badge.text,
-                  }}
-                >
-                  {entity.type}
-                </span>
-                <span style={{ opacity: 0.8 }}>
-                  [{formatSpan(entity.nameStart, entity.nameEnd)}]
-                </span>
-                <span style={{ opacity: 0.75 }}>conf={entity.confidence.toFixed(2)}</span>
-                {showExpanded ? <span style={{ opacity: 0.7 }}>id={entity.id}</span> : null}
-                {showExpanded ? (
-                  <span style={{ opacity: 0.7 }}>
-                    evidence={formatOptionalSpan(entity.evidenceStart, entity.evidenceEnd)}
-                  </span>
-                ) : null}
-              </div>
-              <div
-                data-testid={`entity-excerpt-${entity.id}`}
-                style={{
-                  marginTop: compact ? 3 : 4,
-                  opacity: 0.9,
-                  ...(showExpanded ? {} : clampLines(2)),
-                }}
-              >
-                {getExcerpt(sourceText, entity.nameStart, entity.nameEnd)}
-              </div>
-              {entity.context ? (
                 <div
                   style={{
-                    marginTop: 2,
-                    opacity: 0.75,
-                    ...(showExpanded ? {} : clampLines(1)),
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: compact ? 6 : 8,
+                    flexWrap: 'wrap',
+                    lineHeight: compact ? 1.15 : 1.2,
                   }}
                 >
-                  context: {entity.context}
+                  <span
+                    aria-hidden
+                    style={{
+                      width: 14,
+                      height: 14,
+                      borderRadius: '50%',
+                      background: swatch.fill,
+                      border: `1px solid ${swatch.accent}`,
+                    }}
+                  />
+                  <strong>{entity.name}</strong>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      padding: '0 6px',
+                      borderRadius: 999,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      background: badge.bg,
+                      color: badge.text,
+                    }}
+                  >
+                    {entity.type}
+                  </span>
+                  <span style={{ opacity: 0.8 }}>
+                    [{formatSpan(entity.nameStart, entity.nameEnd)}]
+                  </span>
+                  <span style={{ opacity: 0.75 }}>conf={entity.confidence.toFixed(2)}</span>
+                  {showExpanded ? <span style={{ opacity: 0.7 }}>id={entity.id}</span> : null}
+                  {showExpanded ? (
+                    <span style={{ opacity: 0.7 }}>
+                      evidence={formatOptionalSpan(entity.evidenceStart, entity.evidenceEnd)}
+                    </span>
+                  ) : null}
                 </div>
-              ) : null}
-            </li>
-          );
-        })}
+                <div
+                  data-testid={`entity-excerpt-${entity.id}`}
+                  style={{
+                    marginTop: compact ? 3 : 4,
+                    opacity: 0.9,
+                    ...(showExpanded ? {} : clampLines(2)),
+                  }}
+                >
+                  {getExcerpt(sourceText, entity.nameStart, entity.nameEnd)}
+                </div>
+                {entity.context ? (
+                  <div
+                    style={{
+                      marginTop: 2,
+                      opacity: 0.75,
+                      ...(showExpanded ? {} : clampLines(1)),
+                    }}
+                  >
+                    context: {entity.context}
+                  </div>
+                ) : null}
+              </li>
+            );
+          })
+        )}
       </ul>
     </div>
   );

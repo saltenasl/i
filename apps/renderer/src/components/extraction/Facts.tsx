@@ -52,63 +52,67 @@ export const ExtractionFacts = ({
           gap: compact ? 6 : 8,
         }}
       >
-        {facts.map((fact) => {
-          const ownerSwatch = getEntitySwatch(fact.ownerEntityId, entitySwatchById);
-          const isActive = active.factIds.has(fact.id);
-          const showExpanded = !compact || isActive;
-          return (
-            <li
-              key={fact.id}
-              data-testid={`fact-row-${fact.id}`}
-              data-active={isActive ? 'true' : 'false'}
-              onMouseEnter={() => setHoverTarget({ kind: 'fact', factId: fact.id })}
-              onMouseLeave={() => setHoverTarget(null)}
-              style={{
-                ...itemRow,
-                padding: compact ? '8px 10px' : itemRow.padding,
-                borderLeft: `5px solid ${ownerSwatch.accent}`,
-                background: isActive ? '#f8f2e7' : '#f7f7f8',
-                outline: isActive ? `2px solid ${ownerSwatch.accent}` : 'none',
-                fontSize: compact ? 13 : 14,
-              }}
-            >
-              <div style={showExpanded ? undefined : clampLines(2)}>
-                owner=<strong>{getEntityLabel(fact.ownerEntityId)}</strong> perspective=
-                <strong>{fact.perspective}</strong> | {getEntityLabel(fact.subjectEntityId)} {'->'}{' '}
-                <strong>{fact.predicate}</strong> {'->'}{' '}
-                {fact.objectEntityId
-                  ? getEntityLabel(fact.objectEntityId)
-                  : (fact.objectText ?? '-')}{' '}
-                | [{formatSpan(fact.evidenceStart, fact.evidenceEnd)}]
-              </div>
-              <div
+        {!facts || facts.length === 0 ? (
+          <li style={{ opacity: 0.7 }}>-</li>
+        ) : (
+          facts.map((fact) => {
+            const ownerSwatch = getEntitySwatch(fact.ownerEntityId, entitySwatchById);
+            const isActive = active.factIds.has(fact.id);
+            const showExpanded = !compact || isActive;
+            return (
+              <li
+                key={fact.id}
+                data-testid={`fact-row-${fact.id}`}
+                data-active={isActive ? 'true' : 'false'}
+                onMouseEnter={() => setHoverTarget({ kind: 'fact', factId: fact.id })}
+                onMouseLeave={() => setHoverTarget(null)}
                 style={{
-                  marginTop: 3,
-                  opacity: 0.78,
-                  ...(showExpanded ? {} : clampLines(1)),
+                  ...itemRow,
+                  padding: compact ? '8px 10px' : itemRow.padding,
+                  borderLeft: `5px solid ${ownerSwatch.accent}`,
+                  background: isActive ? '#f8f2e7' : '#f7f7f8',
+                  outline: isActive ? `2px solid ${ownerSwatch.accent}` : 'none',
+                  fontSize: compact ? 13 : 14,
                 }}
               >
-                {showExpanded ? (
-                  <>
-                    id={fact.id} segment={fact.segmentId ?? '-'} confidence=
-                    {fact.confidence.toFixed(2)}
-                  </>
-                ) : (
-                  <>confidence={fact.confidence.toFixed(2)}</>
-                )}
-              </div>
-              <div
-                style={{
-                  marginTop: 2,
-                  opacity: 0.85,
-                  ...(showExpanded ? {} : clampLines(1)),
-                }}
-              >
-                {getExcerpt(sourceText, fact.evidenceStart, fact.evidenceEnd)}
-              </div>
-            </li>
-          );
-        })}
+                <div style={showExpanded ? undefined : clampLines(2)}>
+                  owner=<strong>{getEntityLabel(fact.ownerEntityId)}</strong> perspective=
+                  <strong>{fact.perspective}</strong> | {getEntityLabel(fact.subjectEntityId)}{' '}
+                  {'->'} <strong>{fact.predicate}</strong> {'->'}{' '}
+                  {fact.objectEntityId
+                    ? getEntityLabel(fact.objectEntityId)
+                    : (fact.objectText ?? '-')}{' '}
+                  | [{formatSpan(fact.evidenceStart, fact.evidenceEnd)}]
+                </div>
+                <div
+                  style={{
+                    marginTop: 3,
+                    opacity: 0.78,
+                    ...(showExpanded ? {} : clampLines(1)),
+                  }}
+                >
+                  {showExpanded ? (
+                    <>
+                      id={fact.id} segment={fact.segmentId ?? '-'} confidence=
+                      {fact.confidence.toFixed(2)}
+                    </>
+                  ) : (
+                    <>confidence={fact.confidence.toFixed(2)}</>
+                  )}
+                </div>
+                <div
+                  style={{
+                    marginTop: 2,
+                    opacity: 0.85,
+                    ...(showExpanded ? {} : clampLines(1)),
+                  }}
+                >
+                  {getExcerpt(sourceText, fact.evidenceStart, fact.evidenceEnd)}
+                </div>
+              </li>
+            );
+          })
+        )}
       </ul>
     </div>
   );

@@ -50,7 +50,7 @@ export const ExtractionRelations = ({
           gap: compact ? 6 : 8,
         }}
       >
-        {relations.length === 0 ? (
+        {!relations || relations.length === 0 ? (
           <li style={{ opacity: 0.7 }}>-</li>
         ) : (
           relations.map((relation, index) => {
