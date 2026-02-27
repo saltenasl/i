@@ -27,6 +27,8 @@ const invokeHandler = async (
       return handlers['extract.compare'](request.input);
     case 'extract.history.get':
       return handlers['extract.history.get'](request.input);
+    case 'extract.history.saveCompare':
+      return handlers['extract.history.saveCompare'](request.input);
   }
 
   throw new Error(`Unsupported IPC method: ${(request as AnyIpcApiRequest).method}`);
