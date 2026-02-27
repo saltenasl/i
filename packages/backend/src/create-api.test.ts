@@ -312,8 +312,8 @@ describe('createBackendHandlers', () => {
       runExtractionCompareLane: async (text, laneId) => ({
         laneId,
         provider:
-          laneId === 'local-llama'
-            ? 'local'
+          laneId === 'google-gemini'
+            ? 'google'
             : laneId === 'anthropic-haiku'
               ? 'anthropic'
               : 'openai',
@@ -413,9 +413,9 @@ describe('createBackendHandlers', () => {
       runExtractionCompare: async (text) => ({
         lanes: [
           {
-            laneId: 'local-llama',
-            provider: 'local',
-            model: 'local-llama.cpp',
+            laneId: 'google-gemini',
+            provider: 'google',
+            model: 'gemini-3-flash-preview',
             status: 'ok',
             durationMs: 10,
             extraction: {

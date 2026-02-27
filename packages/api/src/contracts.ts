@@ -119,11 +119,11 @@ export type ExtractionDebug = {
   errors: string[];
 };
 
-export type ExtractionLaneId = 'local-llama' | 'anthropic-haiku' | 'openai-gpt5mini';
+export type ExtractionLaneId = 'google-gemini' | 'anthropic-haiku' | 'openai-gpt5mini';
 
 export type ExtractionLaneResult = {
   laneId: ExtractionLaneId;
-  provider: 'local' | 'anthropic' | 'openai';
+  provider: 'google' | 'anthropic' | 'openai';
   model: string;
   status: 'ok' | 'error' | 'skipped';
   durationMs: number;

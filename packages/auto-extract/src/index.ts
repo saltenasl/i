@@ -1,10 +1,7 @@
-import { type ChildProcess, spawn } from 'node:child_process';
-import net from 'node:net';
-import os from 'node:os';
 import { anthropic } from '@ai-sdk/anthropic';
+import { google } from '@ai-sdk/google';
 import { openai } from '@ai-sdk/openai';
 import { generateObject, generateText, jsonSchema } from 'ai';
-import { ensureAssets } from './assets.js';
 import { buildPromptV2, buildSystemPromptV2, buildUserPromptV2 } from './prompt.js';
 import type { Extraction, ExtractionDebug, FactPerspective, NoteSentiment } from './types.js';
 import { parseAndValidateExtractionV2Output, validateExtractionV2 } from './validate.js';
@@ -294,11 +291,11 @@ const buildHeuristicFallbackExtraction = (text: string): Extraction => {
   };
 };
 
-export type ExtractionLaneId = 'local-llama' | 'anthropic-haiku' | 'openai-gpt5mini';
+export type ExtractionLaneId = 'google-gemini' | 'anthropic-haiku' | 'openai-gpt5mini';
 
 export type ExtractionLaneResult = {
   laneId: ExtractionLaneId;
-  provider: 'local' | 'anthropic' | 'openai';
+  provider: 'google' | 'anthropic' | 'openai';
   model: string;
   status: 'ok' | 'error' | 'skipped';
   durationMs: number;
@@ -309,13 +306,6 @@ export type ExtractionLaneResult = {
 
 type Span = { start: number; end: number };
 
-type LlamaServerRuntime = {
-  baseUrl: string;
-  child: ChildProcess;
-  mode: 'metal' | 'cpu';
-  modelPath: string;
-};
-
 type ExtractionBundle = {
   extraction: Extraction;
   debug: ExtractionDebug;
@@ -323,330 +313,6 @@ type ExtractionBundle = {
 
 const NARRATOR_ENTITY_ID = 'ent_self';
 const NOTETAKER_TERM = 'notetaker';
-
-let assetsPromise: ReturnType<typeof ensureAssets> | undefined;
-let runtimePromise: Promise<LlamaServerRuntime> | undefined;
-
-const getAssets = async () => {
-  assetsPromise ??= ensureAssets();
-  return assetsPromise;
-};
-
-const isMetalFailure = (message: string): boolean => {
-  const lowered = message.toLowerCase();
-  return (
-    lowered.includes('ggml_metal_init') ||
-    lowered.includes('failed to create command queue') ||
-    lowered.includes('failed to initialize  backend') ||
-    lowered.includes('failed to initialize backend') ||
-    lowered.includes('invalid device')
-  );
-};
-
-const getFreePort = async (): Promise<number> => {
-  return await new Promise<number>((resolve, reject) => {
-    const server = net.createServer();
-    server.on('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      if (!address || typeof address === 'string') {
-        server.close(() => reject(new Error('Failed to allocate local port.')));
-        return;
-      }
-
-      const { port } = address;
-      server.close((error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve(port);
-      });
-    });
-  });
-};
-
-const wait = async (ms: number): Promise<void> => {
-  await new Promise<void>((resolve) => setTimeout(resolve, ms));
-};
-
-const isServerHealthy = async (baseUrl: string): Promise<boolean> => {
-  try {
-    const response = await fetch(`${baseUrl}/health`, { method: 'GET' });
-    return response.ok;
-  } catch {
-    return false;
-  }
-};
-
-const startServer = async (
-  serverPath: string,
-  modelPath: string,
-  mode: 'metal' | 'cpu',
-): Promise<LlamaServerRuntime> => {
-  const port = await getFreePort();
-  const baseUrl = `http://127.0.0.1:${port}`;
-  const args = [
-    '-m',
-    modelPath,
-    '--host',
-    '127.0.0.1',
-    '--port',
-    String(port),
-    '--ctx-size',
-    '4096',
-    '--threads',
-    String(Math.max(1, os.availableParallelism() - 2)),
-    '--n-gpu-layers',
-    mode === 'metal' ? 'all' : '0',
-  ];
-
-  if (mode === 'cpu') {
-    args.push('--device', 'none');
-  }
-
-  const child = spawn(serverPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-  child.unref();
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
-
-  let stderr = '';
-  let startupError: Error | null = null;
-
-  child.stderr.on('data', (chunk: string) => {
-    stderr += chunk;
-  });
-
-  child.on('error', (error) => {
-    startupError = new Error(`Failed to start llama-server: ${error.message}`);
-  });
-
-  child.on('close', (code, signal) => {
-    if (!startupError) {
-      const excerpt = stderr.trim().slice(0, 1200);
-      startupError = new Error(
-        `llama-server exited during startup (code: ${code}, signal: ${signal}). ${excerpt}`,
-      );
-    }
-  });
-
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < SERVER_READY_TIMEOUT_MS) {
-    if (startupError) {
-      throw startupError;
-    }
-
-    if (await isServerHealthy(baseUrl)) {
-      child.stdout.removeAllListeners('data');
-      child.stderr.removeAllListeners('data');
-      child.stdout.destroy();
-      child.stderr.destroy();
-      return { baseUrl, child, mode, modelPath };
-    }
-
-    await wait(150);
-  }
-
-  child.kill('SIGTERM');
-  const excerpt = stderr.trim().slice(0, 1200);
-  throw new Error(`Timed out waiting for llama-server readiness. ${excerpt}`);
-};
-
-const getRuntime = async (): Promise<LlamaServerRuntime> => {
-  runtimePromise ??= (async () => {
-    const assets = await getAssets();
-
-    try {
-      return await startServer(assets.llamaServerPath, assets.modelPath, 'metal');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!isMetalFailure(message)) {
-        throw error;
-      }
-
-      return await startServer(assets.llamaServerPath, assets.modelPath, 'cpu');
-    }
-  })();
-
-  return runtimePromise;
-};
-
-const stopRuntime = async (): Promise<void> => {
-  if (!runtimePromise) {
-    return;
-  }
-
-  try {
-    const runtime = await runtimePromise;
-    runtime.child.kill('SIGTERM');
-  } finally {
-    runtimePromise = undefined;
-  }
-};
-
-let exitHandlersRegistered = false;
-const ensureExitHandlers = (): void => {
-  if (exitHandlersRegistered) {
-    return;
-  }
-
-  exitHandlersRegistered = true;
-
-  process.on('beforeExit', () => {
-    void stopRuntime();
-  });
-
-  process.on('SIGINT', () => {
-    void stopRuntime();
-  });
-
-  process.on('SIGTERM', () => {
-    void stopRuntime();
-  });
-};
-
-const readCompletionText = (responseBody: unknown): string => {
-  if (typeof responseBody !== 'object' || responseBody === null) {
-    throw new Error('Unexpected llama-server response shape.');
-  }
-
-  const body = responseBody as Record<string, unknown>;
-
-  if (typeof body.content === 'string') {
-    return body.content;
-  }
-
-  const choices = body.choices;
-  if (Array.isArray(choices)) {
-    const firstChoice = choices[0];
-    if (firstChoice && typeof firstChoice === 'object') {
-      const text = (firstChoice as Record<string, unknown>).text;
-      if (typeof text === 'string') {
-        return text;
-      }
-
-      const message = (firstChoice as Record<string, unknown>).message;
-      if (message && typeof message === 'object') {
-        const content = (message as Record<string, unknown>).content;
-        if (typeof content === 'string') {
-          return content;
-        }
-      }
-    }
-  }
-
-  throw new Error('Unable to find completion text in llama-server response.');
-};
-
-const readChatCompletionText = (responseBody: unknown): string => {
-  if (typeof responseBody !== 'object' || responseBody === null) {
-    throw new Error('Unexpected llama-server chat response shape.');
-  }
-
-  const body = responseBody as Record<string, unknown>;
-  const choices = body.choices;
-  if (!Array.isArray(choices) || choices.length === 0) {
-    throw new Error('llama-server chat response has no choices.');
-  }
-
-  const firstChoice = choices[0];
-  if (!firstChoice || typeof firstChoice !== 'object') {
-    throw new Error('llama-server chat first choice is invalid.');
-  }
-
-  const message = (firstChoice as Record<string, unknown>).message;
-  if (!message || typeof message !== 'object') {
-    throw new Error('llama-server chat choice has no message.');
-  }
-
-  const content = (message as Record<string, unknown>).content;
-  if (typeof content === 'string') {
-    return content;
-  }
-
-  if (Array.isArray(content)) {
-    const joined = content
-      .flatMap((part) => {
-        if (!part || typeof part !== 'object') {
-          return [];
-        }
-        const text = (part as Record<string, unknown>).text;
-        return typeof text === 'string' ? [text] : [];
-      })
-      .join('');
-    if (joined) {
-      return joined;
-    }
-  }
-
-  throw new Error('Unable to find content in llama-server chat response.');
-};
-
-const runLlamaCompletion = async (prompt: string, nPredict: number): Promise<string> => {
-  ensureExitHandlers();
-  const runtime = await getRuntime();
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => {
-    controller.abort();
-  }, SERVER_REQUEST_TIMEOUT_MS);
-
-  try {
-    // Prefer OpenAI-compatible chat completions to improve instruction following on local GGUF models.
-    try {
-      const chatResponse = await fetch(`${runtime.baseUrl}/v1/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'local',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: nPredict,
-          response_format: { type: 'json_object' },
-        }),
-        signal: controller.signal,
-      });
-
-      if (chatResponse.ok) {
-        const chatJson = (await chatResponse.json()) as unknown;
-        return readChatCompletionText(chatJson);
-      }
-    } catch {
-      // Fall back to /completion if chat endpoint is unavailable.
-    }
-
-    const completionResponse = await fetch(`${runtime.baseUrl}/completion`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        prompt,
-        n_predict: nPredict,
-        temperature: 0,
-        repeat_penalty: 1.1,
-        stream: false,
-      }),
-      signal: controller.signal,
-    });
-
-    if (!completionResponse.ok) {
-      const bodyText = await completionResponse.text();
-      throw new Error(
-        `llama-server completion failed (${completionResponse.status}): ${bodyText.slice(0, 600)}`,
-      );
-    }
-
-    const completionJson = (await completionResponse.json()) as unknown;
-    return readCompletionText(completionJson);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to run extraction completion: ${message}`);
-  } finally {
-    clearTimeout(timeout);
-  }
-};
 
 const finalizeExtractionBundle = (
   text: string,
@@ -1027,9 +693,10 @@ const laneMeta: Record<
   ExtractionLaneId,
   { provider: ExtractionLaneResult['provider']; model: string; envKey?: string }
 > = {
-  'local-llama': {
-    provider: 'local',
-    model: 'local-llama.cpp',
+  'google-gemini': {
+    provider: 'google',
+    model: 'gemini-3-flash-preview',
+    envKey: 'GOOGLE_GENERATIVE_AI_API_KEY',
   },
   'anthropic-haiku': {
     provider: 'anthropic',
@@ -1045,7 +712,7 @@ const laneMeta: Record<
 
 const runCloudExtractionBundle = async (
   text: string,
-  laneId: 'anthropic-haiku' | 'openai-gpt5mini',
+  laneId: ExtractionLaneId,
 ): Promise<ExtractionBundle> => {
   const startedAt = Date.now();
   const prompt = buildUserPromptV2(text);
@@ -1058,7 +725,9 @@ const runCloudExtractionBundle = async (
   const model =
     laneId === 'anthropic-haiku'
       ? anthropic(ANTHROPIC_HAIKU_MODEL)
-      : openai(OPENAI_GPT5_MINI_MODEL);
+      : laneId === 'openai-gpt5mini'
+        ? openai(OPENAI_GPT5_MINI_MODEL)
+        : google('gemini-3-flash-preview');
   const providerOptions =
     laneId === 'openai-gpt5mini'
       ? { openai: { reasoningEffort: 'minimal' as const, textVerbosity: 'low' as const } }
@@ -1147,74 +816,7 @@ export async function extractWithDebug(text: string): Promise<{
     throw new Error('extractWithDebug(text) requires a non-empty text string.');
   }
 
-  const startedAt = Date.now();
-  const prompt = buildPromptV2(text);
-  const errors: string[] = [];
-  let rawModelOutput = '';
-
-  const runtime = await getRuntime();
-  let validated: Extraction | null = null;
-  let fallbackUsed = false;
-  let nPredict = FAST_OUTPUT_TOKENS;
-
-  const attempts: Array<{ promptValue: string; nPredictValue: number }> = [
-    { promptValue: prompt, nPredictValue: FAST_OUTPUT_TOKENS },
-    {
-      promptValue: [prompt, '', LOCAL_RECOVERY_DIRECTIVE].join('\n'),
-      nPredictValue: LOCAL_RECOVERY_OUTPUT_TOKENS,
-    },
-  ];
-
-  for (const [index, attempt] of attempts.entries()) {
-    validated = null;
-    try {
-      rawModelOutput = await runLlamaCompletion(attempt.promptValue, attempt.nPredictValue);
-      const parsed = parseAndValidateExtractionV2Output(text, rawModelOutput);
-      validated = postProcessExtractionV2(parsed, text);
-      if (!hasRequiredFacts(validated)) {
-        throw new Error('Model output had no facts.');
-      }
-      nPredict = attempt.nPredictValue;
-      fallbackUsed = index > 0;
-      break;
-    } catch (error) {
-      validated = null;
-      errors.push(error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  if (!validated) {
-    const heuristic = postProcessExtractionV2(buildHeuristicFallbackExtraction(text), text);
-    if (!hasRequiredFacts(heuristic)) {
-      throw new Error(errors.join(' | '));
-    }
-
-    validated = heuristic;
-    rawModelOutput = JSON.stringify(heuristic);
-    fallbackUsed = true;
-    errors.push('Used deterministic fallback extraction due repeated model failures.');
-    nPredict = LOCAL_RECOVERY_OUTPUT_TOKENS;
-  }
-
-  if (!validated) {
-    throw new Error('Extraction validation failed with no parsed result.');
-  }
-
-  return finalizeExtractionBundle(
-    text,
-    prompt,
-    rawModelOutput,
-    validated,
-    startedAt,
-    {
-      modelPath: runtime.modelPath,
-      serverMode: runtime.mode,
-      nPredict,
-      totalMs: 0,
-    },
-    fallbackUsed,
-    errors,
-  );
+  return runCloudExtractionBundle(text, 'google-gemini');
 }
 
 export async function extractCompareLane(
@@ -1231,7 +833,7 @@ export async function extractCompareLane(
   if (!lane) {
     return {
       laneId,
-      provider: 'local',
+      provider: 'google',
       model: 'unknown',
       status: 'error',
       durationMs: Date.now() - startedAt,
@@ -1251,10 +853,7 @@ export async function extractCompareLane(
   }
 
   try {
-    const bundle =
-      laneId === 'local-llama'
-        ? await extractWithDebug(text)
-        : await runCloudExtractionBundle(text, laneId);
+    const bundle = await runCloudExtractionBundle(text, laneId);
 
     return {
       laneId,
@@ -1282,7 +881,7 @@ export async function extractCompare(text: string): Promise<{ lanes: ExtractionL
     throw new Error('extractCompare(text) requires a non-empty text string.');
   }
 
-  const laneOrder: ExtractionLaneId[] = ['local-llama', 'anthropic-haiku', 'openai-gpt5mini'];
+  const laneOrder: ExtractionLaneId[] = ['google-gemini', 'anthropic-haiku', 'openai-gpt5mini'];
   const lanes = await Promise.all(laneOrder.map((laneId) => extractCompareLane(text, laneId)));
   return { lanes };
 }

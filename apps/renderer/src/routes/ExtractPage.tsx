@@ -91,8 +91,8 @@ export const ExtractPage = () => {
           const errorLaneUi = toLaneUi({
             laneId,
             provider:
-              laneId === 'local-llama'
-                ? 'local'
+              laneId === 'google-gemini'
+                ? 'google'
                 : laneId === 'anthropic-haiku'
                   ? 'anthropic'
                   : 'openai',

@@ -320,11 +320,11 @@ describe('App (RTL with real backend implementation)', () => {
       createBackendHandlers({
         db: harness.db,
         runExtractionCompareLane: async (text, laneId) => {
-          if (laneId === 'local-llama') {
+          if (laneId === 'google-gemini') {
             return {
-              laneId: 'local-llama',
-              provider: 'local',
-              model: 'local-llama.cpp',
+              laneId: 'google-gemini',
+              provider: 'google',
+              model: 'gemini-3-flash-preview',
               status: 'ok',
               durationMs: 10,
               extraction: {
@@ -428,7 +428,7 @@ describe('App (RTL with real backend implementation)', () => {
     const compareLanes = screen.getByTestId('compare-lanes-scroll');
     expect(compareLanes).toBeInTheDocument();
     expect(compareLanes).toHaveStyle({ display: 'grid' });
-    expect(screen.getAllByTestId('compare-lane-status-local-llama')[0]).toHaveTextContent('ok');
+    expect(screen.getAllByTestId('compare-lane-status-google-gemini')[0]).toHaveTextContent('ok');
     expect(screen.getAllByTestId('compare-lane-status-anthropic-haiku')[0]).toHaveTextContent(
       'skipped',
     );
@@ -441,7 +441,7 @@ describe('App (RTL with real backend implementation)', () => {
     expect(
       screen.getAllByTestId('compare-lane-message-full-openai-gpt5mini')[0],
     ).toBeInTheDocument();
-    expect(screen.getAllByTestId('compare-lane-vertical-local-llama')[0]).toBeInTheDocument();
+    expect(screen.getAllByTestId('compare-lane-vertical-google-gemini')[0]).toBeInTheDocument();
     expect(screen.getByTestId('extract-compare-button')).toHaveTextContent('Run A/B Compare');
 
     const historyList = await screen.findByTestId('extraction-history-list');

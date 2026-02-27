@@ -9,7 +9,7 @@ import { ExtractionView } from '../extraction/View.js';
 
 export type CompareLaneUi = {
   laneId: ExtractionLaneId;
-  provider: 'local' | 'anthropic' | 'openai';
+  provider: 'google' | 'anthropic' | 'openai';
   model: string;
   status: 'loading' | 'ok' | 'error' | 'skipped';
   durationMs: number | null;
@@ -19,7 +19,7 @@ export type CompareLaneUi = {
 };
 
 export const compareLaneOrder: ExtractionLaneId[] = [
-  'local-llama',
+  'google-gemini',
   'anthropic-haiku',
   'openai-gpt5mini',
 ];
@@ -28,10 +28,10 @@ export const compareLaneMeta: Record<
   ExtractionLaneId,
   { label: string; providerLabel: string; model: string }
 > = {
-  'local-llama': {
-    label: 'Local Llama',
-    providerLabel: 'Local',
-    model: 'local-llama.cpp',
+  'google-gemini': {
+    label: 'Gemini 3 Flash Preview',
+    providerLabel: 'Google',
+    model: 'gemini-3-flash-preview',
   },
   'anthropic-haiku': {
     label: 'Claude Haiku',
@@ -76,7 +76,7 @@ export const createLoadingLane = (laneId: ExtractionLaneId): CompareLaneUi => {
   return {
     laneId,
     provider:
-      laneId === 'local-llama' ? 'local' : laneId === 'anthropic-haiku' ? 'anthropic' : 'openai',
+      laneId === 'google-gemini' ? 'google' : laneId === 'anthropic-haiku' ? 'anthropic' : 'openai',
     model: lane.model,
     status: 'loading',
     durationMs: null,
