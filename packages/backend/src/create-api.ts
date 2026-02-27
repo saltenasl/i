@@ -131,4 +131,30 @@ export const createBackendHandlers = (deps: BackendDependencies): ApiHandlers =>
       });
     }
   },
+  'extract.history.saveCompare': async (input: ApiInput<'extract.history.saveCompare'>) => {
+    const text = input.text.trim();
+    if (!text) {
+      return err('VALIDATION_ERROR', 'Text must not be empty.');
+    }
+
+    try {
+      const representativeLane = input.lanes.find(
+        (lane) => lane.status === 'ok' && lane.extraction && lane.debug,
+      );
+      if (representativeLane?.extraction && representativeLane.debug) {
+        await persistExtractionHistoryService(deps.db, {
+          sourceText: text,
+          prompt: representativeLane.debug.prompt,
+          extraction: representativeLane.extraction,
+          debug: representativeLane.debug,
+          compareLanes: input.lanes,
+        });
+      }
+      return ok({ success: true });
+    } catch (error) {
+      return err('INTERNAL_ERROR', 'Failed to save compare history.', {
+        cause: error instanceof Error ? error.message : String(error),
+      });
+    }
+  },
 });

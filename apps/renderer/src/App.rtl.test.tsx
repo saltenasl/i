@@ -319,9 +319,9 @@ describe('App (RTL with real backend implementation)', () => {
     const api = createApiFromHandlers(
       createBackendHandlers({
         db: harness.db,
-        runExtractionCompare: async (text) => ({
-          lanes: [
-            {
+        runExtractionCompareLane: async (text, laneId) => {
+          if (laneId === 'local-llama') {
+            return {
               laneId: 'local-llama',
               provider: 'local',
               model: 'local-llama.cpp',
@@ -386,26 +386,28 @@ describe('App (RTL with real backend implementation)', () => {
                 fallbackUsed: false,
                 errors: [],
               },
-            },
-            {
+            };
+          }
+          if (laneId === 'anthropic-haiku') {
+            return {
               laneId: 'anthropic-haiku',
               provider: 'anthropic',
               model: 'claude-haiku-4-5-20251001',
               status: 'skipped',
               durationMs: 4,
               errorMessage: 'Missing ANTHROPIC_API_KEY environment variable.',
-            },
-            {
-              laneId: 'openai-gpt5mini',
-              provider: 'openai',
-              model: 'gpt-5-mini',
-              status: 'error',
-              durationMs: 8,
-              errorMessage:
-                'Model output is not valid JSON: Unexpected end of JSON input. Raw output: The road is closed. The road is closed. The road is closed.',
-            },
-          ],
-        }),
+            };
+          }
+          return {
+            laneId: 'openai-gpt5mini',
+            provider: 'openai',
+            model: 'gpt-5-mini',
+            status: 'error',
+            durationMs: 8,
+            errorMessage:
+              'Model output is not valid JSON: Unexpected end of JSON input. Raw output: The road is closed. The road is closed. The road is closed.',
+          };
+        },
       }),
     );
 
@@ -420,7 +422,9 @@ describe('App (RTL with real backend implementation)', () => {
     await user.click(screen.getByTestId('extract-compare-button'));
 
     expect(await screen.findByTestId('compare-results')).toBeInTheDocument();
-    expect(screen.getByTestId('compare-progress')).toHaveTextContent('3/3 complete');
+    await waitFor(() => {
+      expect(screen.getByTestId('compare-progress')).toHaveTextContent('3/3 complete');
+    });
     const compareLanes = screen.getByTestId('compare-lanes-scroll');
     expect(compareLanes).toBeInTheDocument();
     expect(compareLanes).toHaveStyle({ display: 'grid' });

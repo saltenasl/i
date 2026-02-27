@@ -173,6 +173,13 @@ export interface ApiMethodMap {
     };
     output: Result<{ lanes: ExtractionLaneResult[] }, AppErrorCode>;
   };
+  'extract.history.saveCompare': {
+    input: {
+      text: string;
+      lanes: ExtractionLaneResult[];
+    };
+    output: Result<{ success: boolean }, AppErrorCode>;
+  };
   'extract.history.get': {
     input: {
       id: string;

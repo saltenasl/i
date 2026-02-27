@@ -123,7 +123,7 @@ const extractionV2JsonSchema = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['id', 'description', 'evidenceText', 'confidence'],
+        required: ['id', 'description', 'assigneeEntityId', 'evidenceText', 'confidence'],
         properties: {
           id: { type: 'string' },
           description: { type: 'string' },

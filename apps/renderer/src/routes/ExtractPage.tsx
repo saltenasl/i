@@ -73,23 +73,51 @@ export const ExtractPage = () => {
     setError(null);
     setCompareCompleted(0);
     setCompareLanes(compareLaneOrder.map((laneId) => createLoadingLane(laneId)));
-    try {
-      const response = await api.call('extract.compare', { text });
-      if (!response.ok) {
-        setError(response.error.message);
-        setCompareLanes([]);
-        return;
-      }
 
-      const byLaneId = new Map(response.data.lanes.map((lane) => [lane.laneId, toLaneUi(lane)]));
-      setCompareLanes(
-        compareLaneOrder.map((laneId) => byLaneId.get(laneId) ?? createLoadingLane(laneId)),
-      );
-      setCompareCompleted(compareLaneOrder.length);
-    } catch (compareError) {
-      setError(compareError instanceof Error ? compareError.message : String(compareError));
-      setCompareLanes([]);
+    try {
+      const promises = compareLaneOrder.map(async (laneId) => {
+        try {
+          const response = await api.call('extract.compareLane', { text, laneId });
+          if (!response.ok) {
+            throw new Error(response.error.message);
+          }
+          const laneUi = toLaneUi(response.data.lane);
+          setCompareLanes((current) =>
+            current.map((lane) => (lane.laneId === laneId ? laneUi : lane)),
+          );
+          setCompareCompleted((current) => current + 1);
+          return response.data.lane;
+        } catch (error) {
+          const errorLaneUi = toLaneUi({
+            laneId,
+            provider:
+              laneId === 'local-llama'
+                ? 'local'
+                : laneId === 'anthropic-haiku'
+                  ? 'anthropic'
+                  : 'openai',
+            model: 'unknown',
+            status: 'error',
+            durationMs: 0,
+            errorMessage: error instanceof Error ? error.message : String(error),
+          });
+          setCompareLanes((current) =>
+            current.map((lane) => (lane.laneId === laneId ? errorLaneUi : lane)),
+          );
+          setCompareCompleted((current) => current + 1);
+          return null;
+        }
+      });
+
+      const results = await Promise.all(promises);
+      const successfulLanes = results.filter((r) => r !== null);
+      if (successfulLanes.length > 0) {
+        await api.call('extract.history.saveCompare', { text, lanes: successfulLanes });
+      }
+    } catch (globalError) {
+      setError(globalError instanceof Error ? globalError.message : String(globalError));
     }
+
     setIsComparing(false);
     await loadHistory();
   };
