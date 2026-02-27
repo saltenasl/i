@@ -21,7 +21,10 @@ const dumpPageState = async (page: Page): Promise<void> => {
     .locator('body')
     .innerText()
     .catch(() => '<body unavailable>');
-  const hasApi = await page.evaluate(() => Boolean(window.appApi)).catch(() => false);
+  const hasApi = await page
+    // biome-ignore lint/suspicious/noExplicitAny: injected
+    .evaluate(() => Boolean((window as any).appApi))
+    .catch(() => false);
   console.error(`[e2e] page url: ${url}`);
   console.error(`[e2e] window.appApi available: ${hasApi}`);
   console.error(`[e2e] body text: ${body.slice(0, 1000)}`);
@@ -76,12 +79,14 @@ test('fresh profile shows extract input and submit controls', async () => {
   }
 });
 
-test('seeded profile shows extract input and submit controls', async () => {
+test('seeded profile redirects to latest extraction', async () => {
   const launched = await launchApp('baseline');
 
   try {
     try {
-      await assertExtractSmoke(launched.page);
+      await expect(launched.page.getByTestId('extraction-v2-result')).toBeVisible({
+        timeout: 15_000,
+      });
     } catch (error) {
       await dumpPageState(launched.page);
       throw error;

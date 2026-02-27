@@ -15,7 +15,7 @@ const inheritedEnv = Object.fromEntries(
   Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
 );
 
-const launchApp = async () => {
+const launchApp = async (seedProfile: 'fresh' | 'baseline' = 'baseline') => {
   const tempDir = await mkdtemp(path.join(tmpdir(), 'repo-e2e-view-'));
   const dbPath = path.join(tempDir, 'e2e.sqlite');
 
@@ -25,7 +25,7 @@ const launchApp = async () => {
     env: {
       ...inheritedEnv,
       APP_DB_PATH: dbPath,
-      APP_DB_SEED_PROFILE: 'fresh',
+      APP_DB_SEED_PROFILE: seedProfile,
       RENDERER_DIST: rendererDist,
       ELECTRON_ENABLE_LOGGING: '1',
     },
@@ -44,26 +44,29 @@ const launchApp = async () => {
 };
 
 test('navigates to view page from history and renders extraction view', async () => {
-  const launched = await launchApp();
+  const launched = await launchApp('baseline');
 
   try {
     const { page } = launched;
 
-    await expect(page.getByTestId('extract-text-input')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId('nav-extract')).toBeVisible();
-    await expect(page.getByTestId('nav-notes')).toBeVisible();
+    // Wait for the baseline seed auto-redirect to the latest extraction
+    await expect(page.getByTestId('extraction-v2-result')).toBeVisible({ timeout: 15_000 });
 
+    // Go back to the main App
+    await page.getByTestId('view-back-link').click();
+    await expect(page.getByTestId('extract-text-input')).toBeVisible({ timeout: 10_000 });
+
+    // Click on the historical extraction link
     const viewLink = page.locator('[data-testid^="history-view-link-"]').first();
-    const hasHistory = await viewLink.isVisible().catch(() => false);
+    await expect(viewLink).toBeVisible();
+    await viewLink.click();
 
-    if (hasHistory) {
-      await viewLink.click();
-      await expect(page.getByTestId('extraction-v2-result')).toBeVisible({ timeout: 10_000 });
-      await expect(page.getByTestId('view-back-link')).toBeVisible();
+    // Assert it successfully rendered the extraction view again
+    await expect(page.getByTestId('extraction-v2-result')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('view-back-link')).toBeVisible();
 
-      await page.getByTestId('view-back-link').click();
-      await expect(page.getByTestId('extract-text-input')).toBeVisible({ timeout: 10_000 });
-    }
+    await page.getByTestId('view-back-link').click();
+    await expect(page.getByTestId('extract-text-input')).toBeVisible({ timeout: 10_000 });
 
     await page.evaluate(() => {
       window.location.hash = '#/view/nonexistent-id';

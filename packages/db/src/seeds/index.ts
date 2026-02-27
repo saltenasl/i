@@ -20,7 +20,7 @@ export const runSeedProfile = async (db: Kysely<Database>, profile: SeedProfile)
   }
 
   const timestamp = nowIso();
-  await db
+  const noteInsert = await db
     .insertInto('notes')
     .values({
       id: crypto.randomUUID(),
@@ -28,6 +28,33 @@ export const runSeedProfile = async (db: Kysely<Database>, profile: SeedProfile)
       body: 'This note comes from the baseline seed profile.',
       created_at: timestamp,
       updated_at: timestamp,
+    })
+    .executeTakeFirst();
+
+  await db
+    .insertInto('extraction_history')
+    .values({
+      id: crypto.randomUUID(),
+      source_text: 'This is the baseline source text that was extracted.',
+      prompt: 'System prompt...',
+      extraction_v2_json: JSON.stringify({
+        title: 'Baseline Extraction',
+        noteType: 'personal',
+        summary: 'A seeded historical extraction.',
+        language: 'en',
+        date: null,
+        sentiment: 'neutral',
+        emotions: [{ emotion: 'joy', intensity: 3 }],
+        entities: [],
+        facts: [],
+        relations: [],
+        todos: [],
+        groups: [],
+        segments: [],
+      }),
+      debug_json: JSON.stringify({ rawText: 'mock' }),
+      created_at: timestamp,
+      compare_lanes_json: null,
     })
     .executeTakeFirst();
 };

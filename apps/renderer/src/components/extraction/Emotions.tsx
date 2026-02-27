@@ -21,7 +21,7 @@ export const ExtractionEmotions = ({
           gap: compact ? 4 : 6,
         }}
       >
-        {extraction.emotions.length === 0 ? (
+        {!extraction.emotions || extraction.emotions.length === 0 ? (
           <li>-</li>
         ) : (
           extraction.emotions.map((emotion, index) => (
