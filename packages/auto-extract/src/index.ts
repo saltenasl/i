@@ -2,20 +2,14 @@ import { anthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
 import { openai } from '@ai-sdk/openai';
 import { generateObject, generateText, jsonSchema } from 'ai';
-import { buildPromptV2, buildSystemPromptV2, buildUserPromptV2 } from './prompt.js';
+import { buildSystemPromptV2, buildUserPromptV2 } from './prompt.js';
 import type { Extraction, ExtractionDebug, FactPerspective, NoteSentiment } from './types.js';
 import { parseAndValidateExtractionV2Output, validateExtractionV2 } from './validate.js';
 
-const FAST_OUTPUT_TOKENS = 400;
 const CLOUD_OUTPUT_TOKENS = 2_000;
-const LOCAL_RECOVERY_OUTPUT_TOKENS = 1_200;
-const SERVER_READY_TIMEOUT_MS = 45_000;
-const SERVER_REQUEST_TIMEOUT_MS = 20_000;
 const CLOUD_REQUEST_TIMEOUT_MS = 90_000;
 const ANTHROPIC_HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 const OPENAI_GPT5_MINI_MODEL = 'gpt-5-mini';
-const LOCAL_RECOVERY_DIRECTIVE =
-  'CRITICAL: Return exactly one complete JSON object. Ensure emotions/entities/facts/relations/groups are JSON arrays.';
 const CLOUD_RECOVERY_DIRECTIVE =
   'Return one complete JSON object only. Do not omit required arrays (emotions, entities, facts, relations, groups).';
 
@@ -154,141 +148,6 @@ const extractionV2JsonSchema = {
 
 const hasRequiredFacts = (extraction: Extraction): boolean => {
   return extraction.facts.length > 0;
-};
-
-const buildHeuristicFallbackExtraction = (text: string): Extraction => {
-  const iMatch = /\bI\b/i.exec(text);
-  const selfStart = iMatch?.index ?? 0;
-  const selfEnd = selfStart + 1;
-
-  const entities: Extraction['entities'] = [
-    {
-      id: 'ent_self',
-      name: text.slice(selfStart, selfEnd) || 'I',
-      type: 'person',
-      nameStart: selfStart,
-      nameEnd: selfEnd,
-      context: NOTETAKER_TERM,
-      confidence: 0.75,
-    },
-  ];
-
-  const egleMatch = /\bEgle\b/.exec(text);
-  if (egleMatch?.index !== undefined) {
-    entities.push({
-      id: 'ent_egle',
-      name: 'Egle',
-      type: 'person',
-      nameStart: egleMatch.index,
-      nameEnd: egleMatch.index + 'Egle'.length,
-      confidence: 0.9,
-    });
-  }
-
-  const klaipedaMatch = /\bKlaipeda\b/i.exec(text);
-  if (klaipedaMatch?.index !== undefined) {
-    entities.push({
-      id: 'ent_klaipeda',
-      name: 'Klaipeda',
-      type: 'place',
-      nameStart: klaipedaMatch.index,
-      nameEnd: klaipedaMatch.index + 'Klaipeda'.length,
-      confidence: 0.85,
-    });
-  }
-
-  const seasideMatch = /\bseaside\b/i.exec(text);
-  if (seasideMatch?.index !== undefined) {
-    entities.push({
-      id: 'ent_seaside',
-      name: text.slice(seasideMatch.index, seasideMatch.index + 'seaside'.length),
-      type: 'place',
-      nameStart: seasideMatch.index,
-      nameEnd: seasideMatch.index + 'seaside'.length,
-      confidence: 0.75,
-    });
-  }
-
-  const facts: Extraction['facts'] = [];
-  const addFact = (
-    regex: RegExp,
-    predicate: string,
-    ownerEntityId: string,
-    perspective: FactPerspective,
-    extra?: Partial<Extraction['facts'][number]>,
-  ) => {
-    const match = regex.exec(text);
-    if (match?.index === undefined) {
-      return;
-    }
-    const evidenceStart = match.index;
-    const evidenceEnd = match.index + match[0].length;
-    facts.push({
-      id: `fact_${facts.length + 1}`,
-      ownerEntityId,
-      perspective,
-      predicate,
-      evidenceStart,
-      evidenceEnd,
-      confidence: 0.72,
-      ...extra,
-    });
-  };
-
-  addFact(/\bwe were driving\b/i, 'was driving', 'ent_self', 'self');
-  addFact(/\bthere was ice on the highway\b/i, 'encountered ice on highway', 'ent_self', 'self');
-  addFact(
-    /\bI called the people maintaining the road\b/i,
-    'called road maintenance',
-    'ent_self',
-    'self',
-  );
-  addFact(/\bEgle was driving\b/i, 'was driving', 'ent_egle', 'other');
-  addFact(/\bshe was scared\b/i, 'was scared', 'ent_egle', 'other');
-  addFact(/\bi didn't fully support her\b/i, 'did not fully support egle', 'ent_self', 'self', {
-    objectEntityId: 'ent_egle',
-  });
-  addFact(/\bas i was working\b/i, 'was working', 'ent_self', 'self');
-  addFact(
-    /\bton of snow here in Klaipeda\b/i,
-    'observed heavy snow in klaipeda',
-    'ent_self',
-    'self',
-  );
-  addFact(
-    /\bi'm not sure if i'm hallucinating this or not\b/i,
-    'uncertain if memory is real',
-    'ent_self',
-    'self',
-  );
-
-  if (facts.length === 0) {
-    facts.push({
-      id: 'fact_1',
-      ownerEntityId: 'ent_self',
-      perspective: 'self',
-      predicate: 'recorded note',
-      evidenceStart: 0,
-      evidenceEnd: Math.min(text.length, 120),
-      confidence: 0.5,
-    });
-  }
-
-  return {
-    title: 'Extraction fallback',
-    noteType: 'personal_observation',
-    summary: text.slice(0, 220).trim(),
-    language: 'en',
-    date: null,
-    sentiment: 'varied',
-    emotions: [],
-    entities,
-    facts,
-    relations: [],
-    todos: [],
-    groups: [],
-    segments: [],
-  };
 };
 
 export type ExtractionLaneId = 'google-gemini' | 'anthropic-haiku' | 'openai-gpt5mini';

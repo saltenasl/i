@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { type Page, _electron as electron, expect, test } from '@playwright/test';
+import { _electron as electron, expect, test } from '@playwright/test';
 
 test.setTimeout(180_000);
 

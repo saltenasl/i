@@ -1,11 +1,5 @@
 import type { ExtractionHistoryEntryDto } from '@repo/api';
-import { useState } from 'react';
-import {
-  CompareLaneCard,
-  type CompareLaneUi,
-  compareLaneOrder,
-  toLaneUi,
-} from '../compare/CompareLaneCard.js';
+import { CompareLaneCard, compareLaneOrder, toLaneUi } from '../compare/CompareLaneCard.js';
 
 export const ExtractionHistoryList = ({
   historyEntries,

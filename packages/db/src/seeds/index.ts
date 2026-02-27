@@ -20,7 +20,7 @@ export const runSeedProfile = async (db: Kysely<Database>, profile: SeedProfile)
   }
 
   const timestamp = nowIso();
-  const noteInsert = await db
+  await db
     .insertInto('notes')
     .values({
       id: crypto.randomUUID(),
