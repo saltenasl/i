@@ -554,7 +554,7 @@ const laneMeta: Record<
 > = {
   'google-gemini': {
     provider: 'google',
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3.1-flash-lite-preview',
     envKey: 'GOOGLE_GENERATIVE_AI_API_KEY',
   },
   'anthropic-haiku': {
@@ -586,7 +586,7 @@ const runCloudExtractionBundle = async (
       ? anthropic(ANTHROPIC_HAIKU_MODEL)
       : laneId === 'openai-gpt5mini'
         ? openai(OPENAI_GPT5_MINI_MODEL)
-        : google('gemini-3-flash-preview');
+        : google('gemini-3.1-flash-lite-preview');
   const providerOptions =
     laneId === 'openai-gpt5mini'
       ? { openai: { reasoningEffort: 'minimal' as const, textVerbosity: 'low' as const } }

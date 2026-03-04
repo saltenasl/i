@@ -31,7 +31,7 @@ export const compareLaneMeta: Record<
   'google-gemini': {
     label: 'Gemini 3 Flash Preview',
     providerLabel: 'Google',
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3.1-flash-lite-preview',
   },
   'anthropic-haiku': {
     label: 'Claude Haiku',

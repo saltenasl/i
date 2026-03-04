@@ -415,7 +415,7 @@ describe('createBackendHandlers', () => {
           {
             laneId: 'google-gemini',
             provider: 'google',
-            model: 'gemini-3-flash-preview',
+            model: 'gemini-3.1-flash-lite-preview',
             status: 'ok',
             durationMs: 10,
             extraction: {
