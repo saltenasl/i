@@ -1,4 +1,4 @@
-## Mission
+# Mission
 
 Help a person become the best version of themselves.
 
@@ -9,22 +9,3 @@ Create a space where someone can be with their own thoughts, supported by ground
 ## Problem Statement
 
 People are strongly influenced by the technologies they use, and those systems can pull them away from themselves instead of helping them understand themselves more clearly. Any product in this space has to avoid becoming an echo chamber, stay grounded in truth, and make it easier for someone to reconnect with what they actually think, feel, and mean.
-
-# @repo/auto-extract
-
-`@repo/auto-extract` provides LangExtract-like extraction by spawning a local `llama.cpp` binary and validating strict grounding (`value === text.slice(start, end)`) before returning typed output.
-
-## Usage
-
-```ts
-import { extractV2 } from "@repo/auto-extract";
-
-const result = await extractV2("...");
-```
-
-On first call, assets are auto-downloaded to:
-
-- `~/.auto-extract/llama`
-- `~/.auto-extract/model.gguf`
-
-This POC currently targets macOS Apple Silicon only.

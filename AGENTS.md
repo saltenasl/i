@@ -89,6 +89,7 @@
 - Notetaker-first convention: in first-person notes, the notetaker (`I`) is the default owner for first-person evidence; explicit third-party evidence remains `other`.
 - Pronoun convention: `we` implies notetaker involvement and should map to notetaker ownership/perspective unless explicitly excluded.
 - Terminology convention: extraction outputs/prompts should use "notetaker" terminology (or direct first-person `I`) and must not label the author as "narrator".
+- Product framing convention: vision docs should describe a space where someone can be with their own thoughts; if an agent is involved, it serves the user in understanding themselves better and must not be framed as literally being the user or as a "chat with yourself" unless the user explicitly chooses that framing.
 - Sentiment convention: use per-segment sentiment as primary query surface; top-level sentiment is a rollup and uses `varied` when segments differ.
 - Fact language convention: predicates should be concise natural language (spaces), not snake_case, for cross-model consistency and UI readability.
 - UI convention: extraction page must show original source text with color-matched entity highlights and excerpt snippets in the entity list.
