@@ -1,4 +1,4 @@
-import type { Extraction } from '@repo/api';
+import type { Extraction } from '@repo/auto-extract';
 import {
   cardStyle,
   itemRow,
@@ -47,7 +47,7 @@ export const ExtractionSegments = ({
           const widthPct =
             sourceTextLength > 0 ? ((segment.end - segment.start) / sourceTextLength) * 100 : 0;
           const leftPct = sourceTextLength > 0 ? (segment.start / sourceTextLength) * 100 : 0;
-          const sentColor = sentimentColors[segment.sentiment];
+          const sentColor = sentimentColors[segment.sentiment] || sentimentColors.neutral;
           const isActive = active.segmentIds.has(segment.id);
           return (
             <div
@@ -84,7 +84,7 @@ export const ExtractionSegments = ({
       >
         {segments.map((segment) => {
           const isActive = active.segmentIds.has(segment.id);
-          const sentColor = sentimentColors[segment.sentiment];
+          const sentColor = sentimentColors[segment.sentiment] || sentimentColors.neutral;
           return (
             <li
               key={segment.id}

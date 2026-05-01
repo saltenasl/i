@@ -1,4 +1,4 @@
-import type { ExtractionDebug } from '@repo/api';
+import type { ExtractionDebug } from '@repo/auto-extract';
 import { useState } from 'react';
 
 export const ExtractionDebugActions = ({

@@ -1,4 +1,4 @@
-import type { Extraction } from '@repo/api';
+import type { Extraction } from '@repo/auto-extract';
 import type { ActiveHighlights, HoverTarget } from '../types/extraction-ui.js';
 
 const factTouchesEntity = (fact: Extraction['facts'][number], entityId: string): boolean => {

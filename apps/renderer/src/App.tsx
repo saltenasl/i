@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useApi } from './api-context.js';
+import { useRpc } from './api-context.js';
 import { useHashRoute } from './hooks/useHashRoute.js';
 import { ExtractPage } from './routes/ExtractPage.js';
 import { NotesPage } from './routes/NotesPage.js';
@@ -7,7 +7,7 @@ import { ViewPage } from './routes/ViewPage.js';
 
 export const App = () => {
   const { route, params } = useHashRoute();
-  const api = useApi();
+  const rpc = useRpc();
   const didAutoView = useRef(false);
 
   useEffect(() => {
@@ -20,16 +20,17 @@ export const App = () => {
     didAutoView.current = true;
 
     const autoView = async () => {
-      const response = await api.call('extract.history.list', { limit: 1 });
-      if (response.ok) {
-        const latest = response.data.entries[0];
+      const res = await rpc.api.extract.history.list.$get({ query: { limit: '1' } });
+      const data = await res.json();
+      if (data.ok) {
+        const latest = data.history[0];
         if (latest) {
           window.location.hash = `#/view/${latest.id}`;
         }
       }
     };
     void autoView();
-  }, [route, api]);
+  }, [route, rpc]);
 
   return (
     <main

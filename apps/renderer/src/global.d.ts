@@ -1,7 +1,5 @@
-import type { Api } from '@repo/api';
+export {};
 
 declare global {
-  interface Window {
-    appApi?: Api;
-  }
+  // Add global types if needed
 }

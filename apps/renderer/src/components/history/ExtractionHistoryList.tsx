@@ -1,4 +1,4 @@
-import type { ExtractionHistoryEntryDto } from '@repo/api';
+import type { ExtractionHistoryEntry } from '@repo/db';
 import { CompareLaneCard, compareLaneOrder, toLaneUi } from '../compare/CompareLaneCard.js';
 
 export const ExtractionHistoryList = ({
@@ -7,10 +7,10 @@ export const ExtractionHistoryList = ({
   onToggleSelection,
   onOpenEntry,
 }: {
-  historyEntries: ExtractionHistoryEntryDto[];
+  historyEntries: ExtractionHistoryEntry[];
   selectedHistoryIds: Set<string>;
   onToggleSelection: (entryId: string) => void;
-  onOpenEntry: (entry: ExtractionHistoryEntryDto) => void;
+  onOpenEntry: (entry: ExtractionHistoryEntry) => void;
 }) => {
   return (
     <section data-testid="extraction-history" style={{ marginTop: 20, display: 'grid', gap: 10 }}>

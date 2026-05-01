@@ -1,5 +1,8 @@
-import type { Extraction, ExtractionDebug } from '@repo/api';
+import type { Extraction, ExtractionDebug } from '@repo/auto-extract';
 import { render, screen } from '@testing-library/react';
+
+// ALLOW_REAL_AUTO_EXTRACT_WITH_USER_PERMISSION
+// This test only uses @repo/auto-extract for types, not inference.
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { ExtractionView } from './View.js';

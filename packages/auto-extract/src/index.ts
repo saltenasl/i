@@ -3,7 +3,14 @@ import { google } from '@ai-sdk/google';
 import { openai } from '@ai-sdk/openai';
 import { generateObject, generateText, jsonSchema } from 'ai';
 import { buildSystemPromptV2, buildUserPromptV2 } from './prompt.js';
-import type { Extraction, ExtractionDebug, FactPerspective, NoteSentiment } from './types.js';
+import type {
+  Extraction,
+  ExtractionDebug,
+  ExtractionLaneId,
+  ExtractionLaneResult,
+  FactPerspective,
+  NoteSentiment,
+} from './types.js';
 import { parseAndValidateExtractionV2Output, validateExtractionV2 } from './validate.js';
 
 const CLOUD_OUTPUT_TOKENS = 2_000;
@@ -148,19 +155,6 @@ const extractionV2JsonSchema = {
 
 const hasRequiredFacts = (extraction: Extraction): boolean => {
   return extraction.facts.length > 0;
-};
-
-export type ExtractionLaneId = 'google-gemini' | 'anthropic-haiku' | 'openai-gpt5mini';
-
-export type ExtractionLaneResult = {
-  laneId: ExtractionLaneId;
-  provider: 'google' | 'anthropic' | 'openai';
-  model: string;
-  status: 'ok' | 'error' | 'skipped';
-  durationMs: number;
-  extraction?: Extraction;
-  debug?: ExtractionDebug;
-  errorMessage?: string;
 };
 
 type Span = { start: number; end: number };
@@ -750,4 +744,12 @@ export async function extractV2(text: string): Promise<Extraction> {
   return result.extraction;
 }
 
-export type { ExtractionDebug, Extraction } from './types.js';
+export type {
+  Extraction,
+  ExtractionDebug,
+  ExtractionLaneId,
+  ExtractionLaneResult,
+  NoteSentiment,
+  EntityType,
+  FactPerspective,
+} from './types.js';

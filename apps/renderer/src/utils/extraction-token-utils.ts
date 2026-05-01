@@ -1,4 +1,4 @@
-import type { Extraction } from '@repo/api';
+import type { Extraction } from '@repo/auto-extract';
 import type { EnhancedSourceToken, SourceSpan } from '../types/extraction-ui.js';
 
 export const buildEnhancedSourceTokens = (

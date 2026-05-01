@@ -1,21 +1,20 @@
-import type { Api } from '@repo/api';
+import type { AppType } from '@repo/server';
+import { hc } from 'hono/client';
 import { createContext, useContext } from 'react';
 
-export const ApiContext = createContext<Api | null>(null);
+export type RpcClient = ReturnType<typeof hc<AppType>>;
 
-export const useApi = (): Api => {
-  const api = useContext(ApiContext);
-  if (!api) {
-    throw new Error('ApiContext is missing. Wrap the app with ApiProvider.');
+export const RpcContext = createContext<RpcClient | null>(null);
+
+export const useRpc = (): RpcClient => {
+  const rpc = useContext(RpcContext);
+  if (!rpc) {
+    throw new Error('RpcContext is missing. Wrap the app with RpcProvider.');
   }
 
-  return api;
+  return rpc;
 };
 
-export const resolveWindowApi = (): Api => {
-  if (!window.appApi) {
-    throw new Error('window.appApi is not available. Ensure preload bridge is configured.');
-  }
-
-  return window.appApi;
+export const createRpcClient = (baseUrl = '/'): RpcClient => {
+  return hc<AppType>(baseUrl);
 };

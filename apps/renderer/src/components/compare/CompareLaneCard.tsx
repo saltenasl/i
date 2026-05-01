@@ -3,7 +3,7 @@ import type {
   ExtractionDebug,
   ExtractionLaneId,
   ExtractionLaneResult,
-} from '@repo/api';
+} from '@repo/auto-extract';
 import { useState } from 'react';
 import { ExtractionView } from '../extraction/View.js';
 
@@ -84,8 +84,7 @@ export const createLoadingLane = (laneId: ExtractionLaneId): CompareLaneUi => {
 };
 
 export const toLaneUi = (lane: ExtractionLaneResult): CompareLaneUi => {
-  // biome-ignore lint/suspicious/noExplicitAny: Support legacy extractionV2 key from older history entries
-  const extraction = lane.extraction ?? (lane as any).extractionV2;
+  const extraction = lane.extraction;
   return {
     laneId: lane.laneId,
     provider: lane.provider,

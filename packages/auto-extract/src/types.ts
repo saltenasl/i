@@ -19,20 +19,20 @@ export type Extraction = {
     type: EntityType;
     nameStart: number;
     nameEnd: number;
-    evidenceStart?: number;
-    evidenceEnd?: number;
-    context?: string;
+    evidenceStart?: number | undefined;
+    evidenceEnd?: number | undefined;
+    context?: string | undefined;
     confidence: number;
   }>;
   facts: Array<{
     id: string;
     ownerEntityId: string;
     perspective: FactPerspective;
-    segmentId?: string;
-    subjectEntityId?: string;
+    segmentId?: string | undefined;
+    subjectEntityId?: string | undefined;
     predicate: string;
-    objectEntityId?: string;
-    objectText?: string;
+    objectEntityId?: string | undefined;
+    objectText?: string | undefined;
     evidenceStart: number;
     evidenceEnd: number;
     confidence: number;
@@ -41,14 +41,14 @@ export type Extraction = {
     fromEntityId: string;
     toEntityId: string;
     type: string;
-    evidenceStart?: number;
-    evidenceEnd?: number;
+    evidenceStart?: number | undefined;
+    evidenceEnd?: number | undefined;
     confidence: number;
   }>;
   todos: Array<{
     id: string;
     description: string;
-    assigneeEntityId?: string;
+    assigneeEntityId?: string | undefined;
     evidenceStart: number;
     evidenceEnd: number;
     confidence: number;
@@ -90,4 +90,17 @@ export type ExtractionDebug = {
   };
   fallbackUsed: boolean;
   errors: string[];
+};
+
+export type ExtractionLaneId = 'google-gemini' | 'anthropic-haiku' | 'openai-gpt5mini';
+
+export type ExtractionLaneResult = {
+  laneId: ExtractionLaneId;
+  provider: 'google' | 'anthropic' | 'openai';
+  model: string;
+  status: 'ok' | 'error' | 'skipped';
+  durationMs: number;
+  extraction?: Extraction | undefined;
+  debug?: ExtractionDebug | undefined;
+  errorMessage?: string | undefined;
 };

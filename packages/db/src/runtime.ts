@@ -1,11 +1,8 @@
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite';
-import { Kysely, SqliteDialect } from 'kysely';
-import type { Database } from './generated/db.generated.ts';
-import { migrations } from './migrations/index.ts';
-import type { SeedProfile } from './seeds/index.ts';
-import { runSeedProfile } from './seeds/index.ts';
+import { Kysely, SqliteDialect, sql } from 'kysely';
+import type { Migration } from './shared/migration-types.js';
 
 const readerStatementPattern = /^\s*(select|with|pragma|explain)\b/i;
 
@@ -61,23 +58,18 @@ class SqliteDatabaseAdapter {
   }
 }
 
-export interface RuntimeDatabaseOptions {
-  dbPath: string;
-  seedProfile?: SeedProfile;
-}
-
-export const createDb = async (dbPath: string): Promise<Kysely<Database>> => {
+export const createDb = async <T>(dbPath: string): Promise<Kysely<T>> => {
   await mkdir(path.dirname(dbPath), { recursive: true });
   const sqlite = new DatabaseSync(dbPath);
 
-  return new Kysely<Database>({
+  return new Kysely<T>({
     dialect: new SqliteDialect({
       database: new SqliteDatabaseAdapter(sqlite),
     }),
   });
 };
 
-const ensureMigrationTable = async (db: Kysely<Database>): Promise<void> => {
+const ensureMigrationTable = async <T>(db: Kysely<T>): Promise<void> => {
   await db.schema
     .createTable('_migrations')
     .ifNotExists()
@@ -86,11 +78,14 @@ const ensureMigrationTable = async (db: Kysely<Database>): Promise<void> => {
     .execute();
 };
 
-export const runMigrations = async (db: Kysely<Database>): Promise<string[]> => {
+export const runMigrations = async <T>(
+  db: Kysely<T>,
+  migrations: Migration<T>[],
+): Promise<string[]> => {
   await ensureMigrationTable(db);
 
-  const appliedRows = await db.selectFrom('_migrations').select('name').execute();
-  const applied = new Set(appliedRows.map((row) => row.name));
+  const appliedRows = await sql<{ name: string }>`select name from _migrations`.execute(db);
+  const applied = new Set(appliedRows.rows.map((row) => row.name));
   const newlyApplied: string[] = [];
 
   for (const migration of migrations) {
@@ -100,13 +95,10 @@ export const runMigrations = async (db: Kysely<Database>): Promise<string[]> => 
 
     await db.transaction().execute(async (trx) => {
       await migration.up(trx);
-      await trx
-        .insertInto('_migrations')
-        .values({
-          name: migration.name,
-          applied_at: new Date().toISOString(),
-        })
-        .executeTakeFirst();
+
+      await sql`insert into _migrations (name, applied_at) values (${migration.name}, ${new Date().toISOString()})`.execute(
+        trx,
+      );
     });
 
     newlyApplied.push(migration.name);
@@ -115,19 +107,6 @@ export const runMigrations = async (db: Kysely<Database>): Promise<string[]> => 
   return newlyApplied;
 };
 
-export const initializeRuntimeDatabase = async (
-  options: RuntimeDatabaseOptions,
-): Promise<Kysely<Database>> => {
-  const db = await createDb(options.dbPath);
-  await runMigrations(db);
-
-  if (options.seedProfile && options.seedProfile !== 'fresh') {
-    await runSeedProfile(db, options.seedProfile);
-  }
-
-  return db;
-};
-
-export const closeDb = async (db: Kysely<Database>): Promise<void> => {
+export const closeDb = async <T>(db: Kysely<T>): Promise<void> => {
   await db.destroy();
 };

@@ -2,44 +2,72 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { closeDb, initializeRuntimeDatabase } from '../src/runtime.ts';
-import { renderDatabaseTypes } from './generate-db-types.ts';
+import { initializePrimaryRuntimeDatabase } from '../src/primary/runtime.js';
+import { closeDb } from '../src/runtime.js';
+import { initializeUserRuntimeDatabase } from '../src/user/runtime.js';
+import { renderDatabaseTypes } from './generate-db-types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const packageRoot = path.resolve(__dirname, '..');
-const generatedPath = path.join(packageRoot, 'src/generated/db.generated.ts');
+
+const primaryGeneratedPath = path.join(packageRoot, 'src/primary/generated/db.generated.ts');
+const userGeneratedPath = path.join(packageRoot, 'src/user/generated/db.generated.ts');
 
 const normalize = (input: string): string => input.replace(/\r\n/g, '\n').trimEnd();
 
 const run = async (): Promise<void> => {
   const tempDir = await mkdtemp(path.join(tmpdir(), 'db-verify-'));
-  const tempDbPath = path.join(tempDir, 'verify.sqlite');
-  const debugGeneratedPath = path.join(tempDir, 'db.generated.ts');
+  const primaryTempDbPath = path.join(tempDir, 'primary.sqlite');
+  const primaryDebugPath = path.join(tempDir, 'primary.generated.ts');
+  const userTempDbPath = path.join(tempDir, 'user.sqlite');
+  const userDebugPath = path.join(tempDir, 'user.generated.ts');
 
   try {
-    const db = await initializeRuntimeDatabase({
-      dbPath: tempDbPath,
-      seedProfile: 'fresh',
+    const primaryDb = await initializePrimaryRuntimeDatabase({
+      dbPath: primaryTempDbPath,
     });
-    await closeDb(db);
+    await closeDb(primaryDb);
 
-    const generatedFromMigrations = renderDatabaseTypes(tempDbPath);
-    const committed = await readFile(generatedPath, 'utf-8');
+    const primaryGeneratedFromMigrations = renderDatabaseTypes(primaryTempDbPath);
+    const primaryCommitted = await readFile(primaryGeneratedPath, 'utf-8').catch(() => '');
 
-    if (normalize(generatedFromMigrations) !== normalize(committed)) {
-      await writeFile(debugGeneratedPath, generatedFromMigrations, 'utf-8');
+    if (normalize(primaryGeneratedFromMigrations) !== normalize(primaryCommitted)) {
+      await writeFile(primaryDebugPath, primaryGeneratedFromMigrations, 'utf-8');
       throw new Error(
         [
-          'DB type drift detected.',
-          `- Expected (committed): ${generatedPath}`,
-          `- Regenerated snapshot: ${debugGeneratedPath}`,
+          'Primary DB type drift detected.',
+          `- Expected (committed): ${primaryGeneratedPath}`,
+          `- Regenerated snapshot: ${primaryDebugPath}`,
           'Create/update migration and regenerate DB types to resolve drift.',
         ].join('\n'),
       );
     }
 
-    console.log('DB verify passed: migrations and generated DB types are in sync.');
+    const userDb = await initializeUserRuntimeDatabase({
+      dbPath: userTempDbPath,
+      seedProfile: 'fresh',
+    });
+    await closeDb(userDb);
+
+    const userGeneratedFromMigrations = renderDatabaseTypes(userTempDbPath);
+    const userCommitted = await readFile(userGeneratedPath, 'utf-8').catch(() => '');
+
+    if (normalize(userGeneratedFromMigrations) !== normalize(userCommitted)) {
+      await writeFile(userDebugPath, userGeneratedFromMigrations, 'utf-8');
+      throw new Error(
+        [
+          'User DB type drift detected.',
+          `- Expected (committed): ${userGeneratedPath}`,
+          `- Regenerated snapshot: ${userDebugPath}`,
+          'Create/update migration and regenerate DB types to resolve drift.',
+        ].join('\n'),
+      );
+    }
+
+    console.log(
+      'DB verify passed: primary and user migrations and generated DB types are in sync.',
+    );
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }

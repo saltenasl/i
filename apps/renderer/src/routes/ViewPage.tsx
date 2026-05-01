@@ -1,27 +1,29 @@
-import type { ExtractionHistoryEntryDto } from '@repo/api';
+import type { ExtractionHistoryEntry } from '@repo/db';
 import { useCallback, useEffect, useState } from 'react';
-import { useApi } from '../api-context.js';
+import { useRpc } from '../api-context.js';
 import { compareLaneOrder, toLaneUi } from '../components/compare/CompareLaneCard.js';
 import { CompareTimeline } from '../components/compare/CompareTimeline.js';
 import { ExtractionView } from '../components/extraction/View.js';
 
 export const ViewPage = ({ id }: { id: string }) => {
-  const api = useApi();
-  const [entry, setEntry] = useState<ExtractionHistoryEntryDto | null>(null);
+  const rpc = useRpc();
+  const [entry, setEntry] = useState<ExtractionHistoryEntry | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchEntry = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const response = await api.call('extract.history.get', { id });
+    const res = await rpc.api.extract.history.get[':id'].$get({ param: { id } });
+    const data = await res.json();
     setLoading(false);
-    if (!response.ok) {
-      setError(response.error.message);
+
+    if (!data.ok) {
+      setError('Failed to fetch entry');
       return;
     }
-    setEntry(response.data.entry);
-  }, [api, id]);
+    setEntry(data.entry);
+  }, [rpc, id]);
 
   useEffect(() => {
     void fetchEntry();

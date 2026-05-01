@@ -1,6 +1,12 @@
-import type { Extraction, ExtractionDebug, ExtractionHistoryEntryDto } from '@repo/api';
+import type {
+  Extraction,
+  ExtractionDebug,
+  ExtractionLaneId,
+  ExtractionLaneResult,
+} from '@repo/auto-extract';
+import type { ExtractionHistoryEntry } from '@repo/db';
 import { type FormEvent, type KeyboardEvent, useCallback, useEffect, useState } from 'react';
-import { useApi } from '../api-context.js';
+import { useRpc } from '../api-context.js';
 import {
   CompareLaneCard,
   type CompareLaneUi,
@@ -15,7 +21,7 @@ import {
 } from '../components/history/ExtractionHistoryList.js';
 
 export const ExtractPage = () => {
-  const api = useApi();
+  const rpc = useRpc();
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -23,22 +29,25 @@ export const ExtractPage = () => {
   const [isComparing, setIsComparing] = useState(false);
   const [compareCompleted, setCompareCompleted] = useState(0);
   const [compareLanes, setCompareLanes] = useState<CompareLaneUi[]>([]);
-  const [historyEntries, setHistoryEntries] = useState<ExtractionHistoryEntryDto[]>([]);
+  const [historyEntries, setHistoryEntries] = useState<ExtractionHistoryEntry[]>([]);
   const [selectedHistoryIds, setSelectedHistoryIds] = useState<Set<string>>(new Set());
   const [copySelectedState, setCopySelectedState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [result, setResult] = useState<{
     extraction: Extraction;
     debug: ExtractionDebug;
   } | null>(null);
+
   const loadHistory = useCallback(async () => {
-    const response = await api.call('extract.history.list', { limit: 100 });
-    if (!response.ok) {
-      setHistoryError(response.error.message);
+    const res = await rpc.api.extract.history.list.$get({ query: { limit: '100' } });
+    const data = await res.json();
+
+    if (!data.ok) {
+      setHistoryError('Failed to load history');
       return;
     }
     setHistoryError(null);
-    setHistoryEntries(response.data.entries);
-  }, [api]);
+    setHistoryEntries(data.history);
+  }, [rpc]);
 
   useEffect(() => {
     void loadHistory();
@@ -49,20 +58,21 @@ export const ExtractPage = () => {
     setCompareLanes([]);
     setCompareCompleted(0);
 
-    const response = await api.call('extract.run', { text });
+    const res = await rpc.api.extract.run.$post({ json: { text } });
+    const data = await res.json();
 
     setIsSubmitting(false);
 
-    if (!response.ok) {
-      setError(response.error.message);
+    if (!data.ok) {
+      setError('Extraction failed');
       setResult(null);
       return;
     }
 
     setError(null);
     setResult({
-      extraction: response.data.extraction,
-      debug: response.data.debug,
+      extraction: data.extraction,
+      debug: data.debug,
     });
     await loadHistory();
   };
@@ -77,16 +87,20 @@ export const ExtractPage = () => {
     try {
       const promises = compareLaneOrder.map(async (laneId) => {
         try {
-          const response = await api.call('extract.compareLane', { text, laneId });
-          if (!response.ok) {
-            throw new Error(response.error.message);
+          const res = await rpc.api.extract.compareLane.$post({
+            json: { text, laneId: laneId as ExtractionLaneId },
+          });
+          const data = await res.json();
+
+          if (!data.ok) {
+            throw new Error('Lane failed');
           }
-          const laneUi = toLaneUi(response.data.lane);
+          const laneUi = toLaneUi(data.lane);
           setCompareLanes((current) =>
             current.map((lane) => (lane.laneId === laneId ? laneUi : lane)),
           );
           setCompareCompleted((current) => current + 1);
-          return response.data.lane;
+          return data.lane;
         } catch (error) {
           const errorLaneUi = toLaneUi({
             laneId,
@@ -110,9 +124,11 @@ export const ExtractPage = () => {
       });
 
       const results = await Promise.all(promises);
-      const successfulLanes = results.filter((r) => r !== null);
+      const successfulLanes = results.filter((r): r is ExtractionLaneResult => r !== null);
       if (successfulLanes.length > 0) {
-        await api.call('extract.history.saveCompare', { text, lanes: successfulLanes });
+        await rpc.api.extract.history.saveCompare.$post({
+          json: { text, lanes: successfulLanes },
+        });
       }
     } catch (globalError) {
       setError(globalError instanceof Error ? globalError.message : String(globalError));
@@ -176,7 +192,7 @@ export const ExtractPage = () => {
     }
   };
 
-  const openHistoryEntry = (entry: ExtractionHistoryEntryDto) => {
+  const openHistoryEntry = (entry: ExtractionHistoryEntry) => {
     setText(entry.sourceText);
     setResult({
       extraction: entry.extraction,

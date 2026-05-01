@@ -3,8 +3,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { sql } from 'kysely';
 import { afterEach, describe, expect, it } from 'vitest';
-import { migration0001CreateNotes } from './migrations/0001-create-notes.js';
-import { createDb, initializeRuntimeDatabase, runMigrations } from './runtime.js';
+import type { UserDatabase } from './index.js';
+import { migration0001CreateNotes } from './user/migrations/0001-create-notes.js';
+import { migrations as userMigrations } from './user/migrations/index.js';
+import { createDb, initializeUserRuntimeDatabase, runMigrations } from './user/runtime.js';
 
 const tempDirs: string[] = [];
 
@@ -20,10 +22,10 @@ afterEach(async () => {
   }
 });
 
-describe('runtime migrations', () => {
+describe('runtime migrations (user db)', () => {
   it('creates schema on a fresh DB', async () => {
     const dbPath = await makeTempDbPath();
-    const db = await initializeRuntimeDatabase({ dbPath, seedProfile: 'fresh' });
+    const db = await initializeUserRuntimeDatabase({ dbPath, seedProfile: 'fresh' });
 
     const tableRow = await sql<{ name: string }>`
       SELECT name
@@ -38,7 +40,7 @@ describe('runtime migrations', () => {
 
   it('applies pending migrations to an older schema', async () => {
     const dbPath = await makeTempDbPath();
-    const db = await createDb(dbPath);
+    const db = await createDb<UserDatabase>(dbPath);
 
     await db.schema
       .createTable('_migrations')
@@ -48,15 +50,12 @@ describe('runtime migrations', () => {
       .execute();
 
     await migration0001CreateNotes.up(db);
-    await db
-      .insertInto('_migrations')
-      .values({
-        name: migration0001CreateNotes.name,
-        applied_at: new Date().toISOString(),
-      })
-      .executeTakeFirst();
 
-    const applied = await runMigrations(db);
+    await sql`insert into _migrations (name, applied_at) values (${migration0001CreateNotes.name}, ${new Date().toISOString()})`.execute(
+      db,
+    );
+
+    const applied = await runMigrations(db, userMigrations);
     expect(applied).toContain('0002-add-notes-title-index');
     expect(applied).toContain('0003-create-extraction-history');
     expect(applied).toContain('0004-add-compare-lanes-to-extraction-history');

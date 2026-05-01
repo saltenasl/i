@@ -1,25 +1,27 @@
-import type { NoteDto } from '@repo/api';
+import type { Note } from '@repo/db';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
-import { useApi } from '../api-context.js';
+import { useRpc } from '../api-context.js';
 
 export const NotesPage = () => {
-  const api = useApi();
-  const [notes, setNotes] = useState<NoteDto[]>([]);
+  const rpc = useRpc();
+  const [notes, setNotes] = useState<Note[]>([]);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadNotes = useCallback(async () => {
-    const response = await api.call('notes.list', {});
-    if (!response.ok) {
-      setError(response.error.message);
+    const res = await rpc.api.notes.list.$get();
+    const data = await res.json();
+
+    if (!data.ok) {
+      setError('Failed to load notes');
       return;
     }
 
     setError(null);
-    setNotes(response.data.notes);
-  }, [api]);
+    setNotes(data.notes);
+  }, [rpc]);
 
   useEffect(() => {
     void loadNotes();
@@ -29,15 +31,16 @@ export const NotesPage = () => {
     event.preventDefault();
     setIsSubmitting(true);
 
-    const response = await api.call('notes.create', {
-      title,
-      body,
+    const res = await rpc.api.notes.create.$post({
+      json: { title, body },
     });
+
+    const data = await res.json();
 
     setIsSubmitting(false);
 
-    if (!response.ok) {
-      setError(response.error.message);
+    if (!data.ok) {
+      setError('Failed to create note');
       return;
     }
 

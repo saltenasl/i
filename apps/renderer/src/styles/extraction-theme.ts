@@ -1,4 +1,4 @@
-import type { EntityType, NoteSentiment } from '@repo/api';
+import type { EntityType, NoteSentiment } from '@repo/auto-extract';
 
 export const cardStyle = {
   background: '#fff',

@@ -28,7 +28,8 @@ const run = (): void => {
 
   if (generatedChanged && !migrationChanged) {
     console.error('Migration discipline violation detected.');
-    console.error(`- ${generatedFile} changed without any migration file updates.`);
+    console.error(`- ${generatedFile} changed without corresponding migration file updates.`);
+
     console.error(
       'Add a migration in packages/db/src/migrations before changing generated DB types.',
     );

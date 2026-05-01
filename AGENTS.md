@@ -1,10 +1,10 @@
 # AGENTS.md
 
 ## Mission and Engineering Principles
-- Build a robust, verifiable Electron desktop app with a type-safe frontend-backend boundary.
+- Build a robust, verifiable web-first application with a Hono-based Node.js backend and a Vite React SPA, featuring a type-safe RPC boundary.
 - Prefer KISS over abstraction-heavy designs.
 - Optimize for deterministic, headless feedback loops that can run in CLI agents.
-- Favor real implementation tests (real DB, real IPC in E2E) over synthetic mocks.
+- Favor real implementation tests (real DB, in-memory Fetch requests) over synthetic mocks.
 - Build graph-ready personal note extraction that preserves full-note context while remaining strictly span-grounded.
 
 ## Hard Rules
@@ -19,25 +19,29 @@
 - Declare external dependencies in root `package.json` only (monolith dependency management).
 - Avoid experimental runtime/platform features by default; require explicit user approval before using them.
 - Prefer latest stable package versions and LTS runtime baselines where practical.
-- All Kysely calls must live in `packages/backend/src/data-access`.
+- All data access and Kysely calls must live in either `packages/db/src/primary` or `packages/db/src/user` and be accessed via dependency-injected interfaces in route handlers.
 - Any DB schema change must include migration + regenerated DB types in the same commit.
 - `pnpm verify` must pass before commit.
 - `pnpm verify` must complete with zero warnings and zero errors.
-- Full type safety is mandatory; avoid unsafe type escapes (`as never`, chained unknown casts, ts-ignore directives).
+- Full type safety is mandatory; avoid unsafe type escapes (`any`, `as never`, chained unknown casts, ts-ignore directives).
+- NO `any` in production code.
+- NO type casts (`as ...`) in production code unless absolutely unavoidable (e.g., third-party library interop) and documented.
+- End-to-end type safety via Hono RPC is mandatory.
+- Data-access interfaces must be fully typed and injected into the Hono context.
 - AGENTS-first workflow is mandatory: update `AGENTS.md` before implementing any new convention-driven code change.
 
 ## Architecture Boundaries
-- `packages/api`: single shared TypeScript API contract and result types.
-- `apps/electron`: transport boundary only (IPC + app lifecycle), no business logic.
-- `packages/backend/src/services`: use-case/business logic.
-- `packages/backend/src/data-access`: all persistence/query logic with Kysely.
-- `packages/db`: DB runtime, migrations, seeding, generated schema types.
-- `apps/renderer`: React UI only; backend interactions via injected API contract.
+- `apps/renderer`: React UI only; backend interactions via Hono RPC (`hc`), with Vite proxy for dev to avoid CORS.
+- `apps/server`: Hono application handling auth, middleware, business logic, and serving static frontend assets in production.
+- `packages/db`: DB runtime, migrations, and generated schema types, strictly partitioned into:
+  - `src/primary`: PrimaryDbClient for users/sessions.
+  - `src/user`: UserDbClient for notes/history.
+- Route Domain: Handlers receive injected data access interfaces (e.g., `noteRepository`) via Context, never raw DB clients. `primaryDb` is restricted to middleware only.
 
 ## Testing Policy
-- Backend tests always use a real SQLite database.
-- RTL frontend tests use the real backend implementation via API injection (no IPC transport).
-- E2E tests exercise full implementation (Electron + IPC + backend + SQLite).
+- Vitest + JSDOM is the primary integration testing strategy. React network calls intercept to Web standard `Request` objects passed directly to `honoApp.request(req)` with injected in-memory SQLite databases.
+- Playwright E2E tests are reserved for critical user paths (e.g., login, rendering) and must run against the production build (`apps/server` serving the built UI). A separate minimal smoke test verifies the dev proxy.
+- Backend/route tests always use a real in-memory SQLite database.
 - E2E suite must cover both fresh and seeded DB profiles within a single run.
 - Mocks are blocked by policy checker unless explicitly authorized by user.
 - Real `@repo/auto-extract` inference is blocked in tests by policy checker due cost/latency; test flows must use injected/mocked extraction dependencies unless explicitly user-approved for the current task.
@@ -55,6 +59,7 @@
 9. No warnings emitted in command output.
 
 ## Current Execution Plan
+0. Execute Web Migration: Replace Electron with Hono server, implement multi-tenant SQLite with Google SSO, and switch to Vitest+JSDOM full-stack tests.
 1. Stabilize global-context extraction pipeline in `@repo/auto-extract` with strict grounding and deterministic post-processing.
 2. Keep extraction API additive and graph-ready around V2-only payloads (`extraction`, `debug`) with no V1 compatibility surface.
 3. Improve renderer extraction UX: highlighted source text, entity excerpts, fact ownership/perspective clarity, and debug-copy workflow.
@@ -64,8 +69,10 @@
 7. Persist full A/B compare lane snapshots in extraction history and render them as auto-expanded historical lane rows.
 
 ## Decision Log
-- Chosen stack: pnpm workspace, electron-vite, Vite React, Vitest, Playwright Electron, Biome.
-- API contract style: TypeScript-only shared types (no always-on runtime schema parsing).
+- Chosen stack: pnpm workspace, Node.js + Hono, Vite React, Vitest, Playwright Web, Biome.
+- API contract style: Hono RPC (`AppType` exported from server).
+- Web Migration: Replaced Electron with a Hono web server. Adopted custom Google SSO and multi-tenant SQLite (primary DB for auth, individual user DBs for data).
+- Dependency Injection convention: Route handlers receive domain-specific data access interfaces (e.g., `noteRepository`) via Hono Context, never raw DB clients.
 - Error contract: typed Result union (`ok: true/false`).
 - DB test performance strategy: per-suite cloned DB template + per-test savepoint rollback.
 - Hook strategy: `simple-git-hooks` running full verify gate.

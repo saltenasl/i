@@ -1,4 +1,4 @@
-import type { Extraction, ExtractionDebug } from '@repo/api';
+import type { Extraction, ExtractionDebug } from '@repo/auto-extract';
 import { useMemo, useState } from 'react';
 import type { ActiveHighlights, HoverTarget } from '../../types/extraction-ui.js';
 import { buildEntitySwatchMap } from '../../utils/extraction-color-utils.js';

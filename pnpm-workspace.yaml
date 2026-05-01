@@ -4,6 +4,5 @@ packages:
 
 onlyBuiltDependencies:
   - '@biomejs/biome'
-  - electron
   - esbuild
   - simple-git-hooks

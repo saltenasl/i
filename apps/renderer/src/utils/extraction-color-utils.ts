@@ -1,4 +1,4 @@
-import type { Extraction } from '@repo/api';
+import type { Extraction } from '@repo/auto-extract';
 import type { EntitySwatch } from '../types/extraction-ui.js';
 
 export const ENTITY_SWATCHES: EntitySwatch[] = [

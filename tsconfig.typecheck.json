@@ -9,9 +9,8 @@
     "baseUrl": ".",
     "jsx": "react-jsx",
     "paths": {
-      "@repo/api": ["packages/api/src/index.ts"],
-      "@repo/backend": ["packages/backend/src/index.ts"],
       "@repo/db": ["packages/db/src/index.ts"],
+      "@repo/server": ["apps/server/src/app.ts"],
       "@repo/test-utils": ["packages/test-utils/src/index.ts"],
       "@repo/auto-extract": ["packages/auto-extract/src/index.ts"]
     }

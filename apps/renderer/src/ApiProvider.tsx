@@ -1,12 +1,11 @@
-import type { Api } from '@repo/api';
 import type { PropsWithChildren } from 'react';
-import { ApiContext, resolveWindowApi } from './api-context.js';
+import { type RpcClient, RpcContext, createRpcClient } from './api-context.js';
 
-export interface ApiProviderProps {
-  api?: Api;
+export interface RpcProviderProps {
+  rpc?: RpcClient;
 }
 
-export const ApiProvider = ({ api, children }: PropsWithChildren<ApiProviderProps>) => {
-  const resolved = api ?? resolveWindowApi();
-  return <ApiContext.Provider value={resolved}>{children}</ApiContext.Provider>;
+export const RpcProvider = ({ rpc, children }: PropsWithChildren<RpcProviderProps>) => {
+  const resolved = rpc ?? createRpcClient();
+  return <RpcContext.Provider value={resolved}>{children}</RpcContext.Provider>;
 };

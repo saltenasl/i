@@ -2,11 +2,11 @@ import { copyFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  type Database,
+  type UserDatabase as Database,
   type SeedProfile,
   closeDb,
   createDb,
-  initializeRuntimeDatabase,
+  initializeUserRuntimeDatabase as initializeRuntimeDatabase,
 } from '@repo/db';
 import { type Kysely, sql } from 'kysely';
 
@@ -32,7 +32,7 @@ export const createDbHarness = async (seedProfile: SeedProfile = 'fresh'): Promi
   await closeDb(templateDb);
   await copyFile(templatePath, runtimePath);
 
-  const db = await createDb(runtimePath);
+  const db = await createDb<Database>(runtimePath);
 
   return {
     db,

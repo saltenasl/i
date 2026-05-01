@@ -1,4 +1,4 @@
-import type { Extraction } from '@repo/api';
+import type { Extraction } from '@repo/auto-extract';
 import {
   cardStyle,
   entityTypeBadges,
@@ -51,7 +51,7 @@ export const ExtractionEntities = ({
             const swatch = getEntitySwatch(entity.id, entitySwatchById);
             const isActive = active.entityIds.has(entity.id);
             const showExpanded = !compact;
-            const badge = entityTypeBadges[entity.type];
+            const badge = entityTypeBadges[entity.type] || { bg: '#f3f4f6', text: '#374151' };
             return (
               <li
                 key={entity.id}

@@ -1,4 +1,4 @@
-import type { Extraction } from '@repo/api';
+import type { Extraction } from '@repo/auto-extract';
 import { cardStyle, emotionIntensityWidth, sectionHeader } from '../../styles/extraction-theme.js';
 
 export const ExtractionEmotions = ({

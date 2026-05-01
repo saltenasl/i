@@ -1,4 +1,4 @@
-import type { Extraction } from '@repo/api';
+import type { Extraction } from '@repo/auto-extract';
 import { useMemo } from 'react';
 import { cardStyle, sectionHeader, sourceTextContainer } from '../../styles/extraction-theme.js';
 import type { ActiveHighlights, EntitySwatch, HoverTarget } from '../../types/extraction-ui.js';

@@ -11,10 +11,15 @@ interface Finding {
 const repoRoot = process.cwd();
 const roots = ['apps', 'packages', 'scripts'];
 const ignoredDirNames = new Set(['dist', 'node_modules', '.git', '.pnpm-store', '.npm-cache']);
-const ignoredPathFragments = ['/packages/db/src/generated/', '/scripts/check-type-safety.ts'];
+const ignoredPathFragments = [
+  '/packages/db/src/primary/generated/',
+  '/packages/db/src/user/generated/',
+  '/scripts/check-type-safety.ts',
+];
 const sourceFilePattern = /\.(ts|tsx)$/;
 
 const forbiddenPatterns: Array<{ regex: RegExp; label: string }> = [
+  { regex: /\bany\b/g, label: 'Forbidden type: any' },
   { regex: /\bas never\b/g, label: 'Forbidden cast: as never' },
   { regex: /as unknown as/g, label: 'Forbidden chained cast: as unknown as' },
   { regex: /@ts-ignore/g, label: 'Forbidden directive: @ts-ignore' },
