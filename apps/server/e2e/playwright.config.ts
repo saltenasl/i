@@ -5,7 +5,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  reporter: 'html',
+  reporter: [['html', { open: 'never' }]],
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
@@ -16,14 +16,17 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
+  testIgnore: '**/smoke.test.ts',
   webServer: {
-    command: 'pnpm --filter @repo/server dev',
+    command: 'pnpm start',
+    cwd: '../../..',
     url: 'http://localhost:3000/api/health',
     reuseExistingServer: !process.env.CI,
     env: {
       PRIMARY_DB_PATH: ':memory:',
       USER_DATA_DIR: '/tmp/users',
       NODE_ENV: 'production',
+      ALLOW_MOCK_LOGIN: 'true',
     },
   },
 });

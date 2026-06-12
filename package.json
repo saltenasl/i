@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "mkdir -p .local/data/users && PRIMARY_DB_PATH=$(pwd)/.local/data/primary.sqlite USER_DATA_DIR=$(pwd)/.local/data/users concurrently -k -n renderer,server \"pnpm --filter @repo/renderer dev\" \"pnpm --filter @repo/server dev\"",
     "build": "pnpm --filter @repo/renderer build && pnpm --filter @repo/server build",
+    "start": "NODE_ENV=production PRIMARY_DB_PATH=$(pwd)/.local/data/primary.sqlite USER_DATA_DIR=$(pwd)/.local/data/users node --import dotenv/config --import tsx apps/server/src/index.ts",
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
@@ -20,8 +21,9 @@
     "test:backend": "vitest run -c packages/auto-extract/vitest.config.ts && vitest run -c packages/db/vitest.config.ts",
     "test:server": "vitest run -c apps/server/vitest.config.ts",
     "test:rtl": "vitest run -c apps/renderer/vitest.config.ts",
+    "test:smoke": "playwright test -c apps/server/e2e/smoke.config.ts",
     "test:e2e": "pnpm build && playwright test -c apps/server/e2e/playwright.config.ts",
-    "verify": "env -u NO_COLOR pnpm lint && env -u NO_COLOR pnpm typecheck && env -u NO_COLOR pnpm type-safety:check && env -u NO_COLOR pnpm arch:check && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm db:verify && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:backend && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:server && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:rtl && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:e2e",
+    "verify": "env -u NO_COLOR pnpm lint && env -u NO_COLOR pnpm typecheck && env -u NO_COLOR pnpm type-safety:check && env -u NO_COLOR pnpm arch:check && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm db:verify && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:backend && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:server && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:rtl && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:smoke && env -u NO_COLOR NODE_OPTIONS=--disable-warning=ExperimentalWarning pnpm test:e2e",
     "prepare": "simple-git-hooks"
   },
   "dependencies": {

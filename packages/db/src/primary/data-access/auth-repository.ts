@@ -23,6 +23,7 @@ export interface UserRepository {
 export interface SessionRepository {
   create(userId: string, expiresAt: Date): Promise<Session>;
   getById(id: string): Promise<Session | null>;
+  updateExpiration(id: string, expiresAt: Date): Promise<void>;
   delete(id: string): Promise<void>;
 }
 
@@ -93,6 +94,15 @@ export const createSessionRepository = (db: PrimaryDbClient): SessionRepository 
   async getById(id) {
     const row = await db.selectFrom('sessions').selectAll().where('id', '=', id).executeTakeFirst();
     return row ? mapSessionRow(row) : null;
+  },
+
+  async updateExpiration(id, expiresAt) {
+    const expiresAtIso = expiresAt.toISOString();
+    await db
+      .updateTable('sessions')
+      .set({ expires_at: expiresAtIso })
+      .where('id', '=', id)
+      .execute();
   },
 
   async delete(id) {

@@ -34,8 +34,58 @@ export declare const createApp: (deps?: AppDependencies) => import("hono/hono-ba
         };
     };
 } & {
+    "/api/auth/google": {
+        $get: {
+            input: {};
+            output: {
+                ok: false;
+                error: string;
+            };
+            outputFormat: "json";
+            status: 500;
+        } | {
+            input: {};
+            output: undefined;
+            outputFormat: "redirect";
+            status: 302;
+        };
+    };
+} & {
+    "/api/auth/google/callback": {
+        $get: {
+            input: {};
+            output: undefined;
+            outputFormat: "redirect";
+            status: 302;
+        } | {
+            input: {};
+            output: {
+                ok: false;
+                error: string;
+            };
+            outputFormat: "json";
+            status: 400;
+        } | {
+            input: {};
+            output: {
+                ok: false;
+                error: string;
+            };
+            outputFormat: "json";
+            status: 500;
+        };
+    };
+} & {
     "/api/auth/mock-login": {
         $get: {
+            input: {};
+            output: {
+                ok: false;
+                error: string;
+            };
+            outputFormat: "json";
+            status: 404;
+        } | {
             input: {};
             output: {
                 ok: true;
@@ -1633,8 +1683,58 @@ declare const appForType: import("hono/hono-base").HonoBase<Env, {
         };
     };
 } & {
+    "/api/auth/google": {
+        $get: {
+            input: {};
+            output: {
+                ok: false;
+                error: string;
+            };
+            outputFormat: "json";
+            status: 500;
+        } | {
+            input: {};
+            output: undefined;
+            outputFormat: "redirect";
+            status: 302;
+        };
+    };
+} & {
+    "/api/auth/google/callback": {
+        $get: {
+            input: {};
+            output: undefined;
+            outputFormat: "redirect";
+            status: 302;
+        } | {
+            input: {};
+            output: {
+                ok: false;
+                error: string;
+            };
+            outputFormat: "json";
+            status: 400;
+        } | {
+            input: {};
+            output: {
+                ok: false;
+                error: string;
+            };
+            outputFormat: "json";
+            status: 500;
+        };
+    };
+} & {
     "/api/auth/mock-login": {
         $get: {
+            input: {};
+            output: {
+                ok: false;
+                error: string;
+            };
+            outputFormat: "json";
+            status: 404;
+        } | {
             input: {};
             output: {
                 ok: true;

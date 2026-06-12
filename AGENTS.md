@@ -69,6 +69,10 @@
 7. Persist full A/B compare lane snapshots in extraction history and render them as auto-expanded historical lane rows.
 
 ## Decision Log
+- Auth convention: Real Google SSO implemented using raw `fetch` for zero vendor lock-in and minimal dependencies.
+- Session convention: Sliding sessions implemented (e.g., refresh to 30 days if under 15 days remaining) on authenticated requests to prevent unexpected logouts.
+- Testing convention: E2E tests run against the production build (`pnpm start`); dev server is validated with a separate smoke test configuration (`pnpm test:smoke`).
+- Script convention: Added `start` script to root `package.json` for running the production server locally with environment variables.
 - Chosen stack: pnpm workspace, Node.js + Hono, Vite React, Vitest, Playwright Web, Biome.
 - API contract style: Hono RPC (`AppType` exported from server).
 - Web Migration: Replaced Electron with a Hono web server. Adopted custom Google SSO and multi-tenant SQLite (primary DB for auth, individual user DBs for data).

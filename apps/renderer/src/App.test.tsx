@@ -91,6 +91,6 @@ describe('App Full-Stack Integration', () => {
       </RpcProvider>,
     );
 
-    expect(screen.getByText(/Auto Extract/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Sign in with Google/i)).toBeInTheDocument();
   });
 });

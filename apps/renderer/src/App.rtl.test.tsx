@@ -52,13 +52,12 @@ describe('App (RTL with Full-Stack Integration)', () => {
 
   it('shows extract form by default after login', async () => {
     setupApp();
+    await fetch('/api/auth/mock-login');
     render(
       <RpcProvider>
         <App />
       </RpcProvider>,
     );
-
-    await fetch('/api/auth/mock-login');
 
     expect(await screen.findByTestId('extract-text-input')).toBeInTheDocument();
     expect(screen.getByTestId('extract-submit-button')).toBeInTheDocument();
@@ -66,14 +65,13 @@ describe('App (RTL with Full-Stack Integration)', () => {
 
   it('creates and lists notes', async () => {
     setupApp();
+    await fetch('/api/auth/mock-login');
     const user = userEvent.setup();
     render(
       <RpcProvider>
         <App />
       </RpcProvider>,
     );
-
-    await fetch('/api/auth/mock-login');
 
     await user.click(await screen.findByTestId('nav-notes'));
     expect(await screen.findByTestId('empty-state')).toBeInTheDocument();
@@ -135,14 +133,13 @@ describe('App (RTL with Full-Stack Integration)', () => {
       }),
     });
 
+    await fetch('/api/auth/mock-login');
     const user = userEvent.setup();
     render(
       <RpcProvider>
         <App />
       </RpcProvider>,
     );
-
-    await fetch('/api/auth/mock-login');
 
     await user.type(await screen.findByTestId('extract-text-input'), text);
     await user.click(screen.getByTestId('extract-submit-button'));
@@ -179,14 +176,13 @@ describe('App (RTL with Full-Stack Integration)', () => {
       },
     });
 
+    await fetch('/api/auth/mock-login');
     const user = userEvent.setup();
     render(
       <RpcProvider>
         <App />
       </RpcProvider>,
     );
-
-    await fetch('/api/auth/mock-login');
 
     await user.type(await screen.findByTestId('extract-text-input'), 'Compare this');
     await user.click(screen.getByTestId('extract-compare-button'));

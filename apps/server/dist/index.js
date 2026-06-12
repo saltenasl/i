@@ -1,3 +1,4 @@
+import 'dotenv/config'; // Loads from process.cwd() which is root in production
 import { serve } from '@hono/node-server';
 import { createApp } from './app.js';
 const app = createApp();
